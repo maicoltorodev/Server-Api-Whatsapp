@@ -216,12 +216,15 @@ async function markMessageAsRead(messageId) {
     } catch (e) { }
 }
 
+// --- 4. RUTAS DE SALUD Y VERIFICACIÓN ---
+app.get('/', (req, res) => res.status(200).send('✅ WhatsApp Bot Online'));
+
 app.get('/webhook', (req, res) => {
     if (req.query['hub.verify_token'] === process.env.VERIFY_TOKEN) res.send(req.query['hub.challenge']);
     else res.sendStatus(403);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     console.log(`\n==================================================`);
     console.log(`🚀 SERVIDOR HÍBRIDO SEGURO ACTIVO (MODO CLOUD)`);
     console.log(`📡 Puerto: ${PORT}`);
