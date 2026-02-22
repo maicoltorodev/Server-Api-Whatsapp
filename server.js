@@ -221,4 +221,10 @@ app.get('/webhook', (req, res) => {
     else res.sendStatus(403);
 });
 
-app.listen(PORT, () => console.log(`🚀 SERVIDOR HÍBRIDO SEGURO (WA.ME) ACTIVO EN PUERTO ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n==================================================`);
+    console.log(`🚀 SERVIDOR HÍBRIDO SEGURO ACTIVO (MODO CLOUD)`);
+    console.log(`📡 Puerto: ${PORT}`);
+    console.log(`🤖 Supervisando chats y sesiones activas...`);
+    console.log(`==================================================\n`);
+});
