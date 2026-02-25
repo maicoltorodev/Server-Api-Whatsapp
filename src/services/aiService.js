@@ -32,7 +32,7 @@ class AIService {
     6. Si está muy enojado o frustrado, o pide explicitamente un humano, usa 'transfer_to_human'.`;
 
     this.model = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro",
+      model: "gemini-2.5-flash",
       tools: [tools],
       systemInstruction
     });
