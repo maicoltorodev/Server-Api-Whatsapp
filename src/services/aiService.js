@@ -34,7 +34,7 @@ class AIService {
     4. Traspaso humano -> Solo si el cliente lo pide o está frustrado, usa 'transfer_to_human'.`;
 
     this.model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash", // Usando flash para velocidad
+      model: "gemini-1.5-flash", // Cambiado a 1.5 por estabilidad de cuota
       tools: [tools],
       systemInstruction
     });
@@ -105,13 +105,28 @@ class AIService {
   _sanitizeHistory(history) {
     if (history.length === 0) return [];
 
-    // Gemini requiere que el historial empiece con 'user' y sea alternado
+    // 1. Gemini requiere que el historial sea alternado (user, model, user, model...)
+    // 2. IMPORTANTE: Como el mensaje actual lo enviaremos con .sendMessage(message), 
+    //    el historial que le pasamos a .startChat NO debe terminar en 'user'.
+    //    Si termina en 'user', Gemini dará error porque esperaría un mensaje del 'model'.
+
+    let sanitized = [...history];
+
+    // Si el último mensaje es del usuario, lo quitamos del historial de inicio 
+    // porque es el que vamos a enviar en el prompt actual.
+    if (sanitized.length > 0 && sanitized[sanitized.length - 1].role === 'user') {
+      console.log(`   [IA] Historial ajustado: quitando último mensaje 'user' para evitar error de alternancia.`);
+      sanitized.pop();
+    }
+
+    // Asegurarnos de que empiece por 'user' (si queda algo)
     let startIndex = 0;
-    while (startIndex < history.length && history[startIndex].role !== 'user') {
+    while (startIndex < sanitized.length && sanitized[startIndex].role !== 'user') {
       startIndex++;
     }
 
-    return history.slice(startIndex).slice(-10); // Últimos 10 mensajes para contexto fresco
+    const finalHistory = sanitized.slice(startIndex).slice(-10); // Mantener solo los últimos 10 de contexto
+    return finalHistory;
   }
 }
 
