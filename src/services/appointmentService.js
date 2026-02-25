@@ -279,7 +279,7 @@ class AppointmentService {
       const { data: appointments, error } = await supabase
         .from('appointments')
         .select('*')
-        .eq('lead_phone_number', phone)
+        .eq('phone', phone)
         .eq('appointment_date', date)
         .neq('status', 'cancelada')
         .order('created_at', { ascending: false })
@@ -342,7 +342,7 @@ class AppointmentService {
   async getAppointmentsForDay(date) {
     const { data, error } = await supabase
       .from('appointments')
-      .select('id, lead_phone_number, pet_name, start_time')
+      .select('id, phone, pet_name, start_time')
       .eq('appointment_date', date)
       .eq('status', 'agendada');
 

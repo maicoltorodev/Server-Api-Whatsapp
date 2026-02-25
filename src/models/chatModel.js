@@ -8,7 +8,7 @@ class ChatModel {
     const { data, error } = await supabase
       .from('chats')
       .select('history')
-      .eq('phone_number', phone)
+      .eq('phone', phone)
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = not found
@@ -26,10 +26,10 @@ class ChatModel {
     const { data, error } = await supabase
       .from('chats')
       .upsert({
-        phone_number: phone,
+        phone: phone,
         history: history,
         updated_at: new Date()
-      }, { onConflict: 'phone_number' })
+      }, { onConflict: 'phone' })
       .select()
       .single();
 
@@ -61,7 +61,7 @@ class ChatModel {
     const { data, error } = await supabase
       .from('chats')
       .delete()
-      .eq('phone_number', phone);
+      .eq('phone', phone);
 
     if (error) {
       console.error(`🔥 BD Error (chatModel.clearHistory) [${phone}]:`, error.message);
@@ -77,7 +77,7 @@ class ChatModel {
   async getAllChats() {
     const { data, error } = await supabase
       .from('chats')
-      .select('phone_number, updated_at')
+      .select('phone, updated_at')
       .order('updated_at', { ascending: false });
 
     if (error) {

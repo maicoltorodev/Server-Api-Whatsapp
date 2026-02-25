@@ -1,6 +1,5 @@
 const supabase = require('../config/database');
-const whatsappService = require('../services/whatsappService');
-const leadModel = require('../models/leadModel');
+const conversationService = require('../services/conversationService');
 const systemEvents = require('../utils/eventEmitter');
 
 class AdminController {
@@ -38,7 +37,7 @@ class AdminController {
         try {
             const { phone } = req.params;
             const { data: leadData, error: leadError } = await supabase.from('leads').select('*').eq('phone', phone).single();
-            const { data: chatData, error: chatError } = await supabase.from('chats').select('*').eq('phone_number', phone).single();
+            const { data: chatData, error: chatError } = await supabase.from('chats').select('*').eq('phone', phone).single();
 
             res.json({
                 status: 'success',
@@ -64,18 +63,11 @@ class AdminController {
                 return res.status(400).json({ status: 'error', message: 'phone y message son requeridos' });
             }
 
-            // Asegurar en DB que la IA está inmersa/desactivada para ceder el paso
-            await leadModel.deactivateBot(phone);
-
-            // Enviarlo vía WhatsApp Api
-            await whatsappService.sendMessage(phone, message);
-
-            // (Recomendado futuro: Anexar este manual sent al 'chatModel' local del history para que la IA sepa cuando vuelva que el humano habló)
-
-            res.json({ status: 'success', message: 'Mensaje enviado a cliente con éxito', bot_deactivated: true });
+            const result = await conversationService.sendManualMessage(phone, message);
+            res.json(result);
         } catch (error) {
             console.error("Dashboard Error (sendManualMessage):", error.message);
-            res.status(500).json({ status: 'error', message: 'Error delegando y enviando el texto a wsp.' });
+            res.status(500).json({ status: 'error', message: 'Error enviando mensaje manual' });
         }
     }
 
@@ -88,24 +80,14 @@ class AdminController {
             const { active } = req.body;
 
             if (typeof active !== 'boolean') {
-                return res.status(400).json({ status: 'error', message: '"active" boolean true/false requerido en el body' });
+                return res.status(400).json({ status: 'error', message: '"active" boolean true/false requerido' });
             }
 
-            if (active) {
-                await leadModel.activateBot(phone);
-                // Opcional: Avisar cortésmente al cliente.
-                await whatsappService.sendMessage(phone, "¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖");
-            } else {
-                await leadModel.deactivateBot(phone);
-            }
-
-            // Notificamos a otros paneles mediante SSE
-            systemEvents.emit('lead_updated', { phone, bot_active: active });
-
-            res.json({ status: 'success', message: `Bot ${active ? 'reactivado' : 'pausado'} para ${phone}` });
+            const result = await conversationService.toggleBot(phone, active);
+            res.json(result);
         } catch (error) {
             console.error("Dashboard Error (toggleBot):", error.message);
-            res.status(500).json({ status: 'error', message: 'Fallo al cambiar el estatus del IA para este plomo.' });
+            res.status(500).json({ status: 'error', message: 'Fallo al cambiar estatus del bot' });
         }
     }
 

@@ -36,8 +36,8 @@ class ReminderJob {
   async sendDailyReminders() {
     try {
       // Obtener fecha actual en Bogotá
-      const boDate = new Date(new Date().toLocaleString("en-US", { 
-        timeZone: config.TIMEZONE 
+      const boDate = new Date(new Date().toLocaleString("en-US", {
+        timeZone: config.TIMEZONE
       }));
       const todayStr = `${boDate.getFullYear()}-${(boDate.getMonth() + 1).toString().padStart(2, '0')}-${boDate.getDate().toString().padStart(2, '0')}`;
 
@@ -48,7 +48,7 @@ class ReminderJob {
           const message = `¡Buenos días! 🐾 Te escribimos de Pet Care Studio para recordarte la cita de ${appointment.pet_name} para hoy a las ${appointment.start_time.substring(0, 5)}. ¡Te esperamos! 😊 (Evita responder a este SMS automatizado)`;
 
           // Enviar por SMS (fuera de ventana de 24h de WhatsApp)
-          await notificationService.sendSMS(appointment.lead_phone_number, message);
+          await notificationService.sendSMS(appointment.phone, message);
 
           // Pausar 1 segundo entre envíos para evitar rate limits
           await new Promise(resolve => setTimeout(resolve, 1000));
