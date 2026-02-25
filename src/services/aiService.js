@@ -49,9 +49,15 @@ class AIService {
     // Limitar historial para ahorrar tokens pero sin romper pares de "functionCall / functionResponse"
     let startIndex = Math.max(0, history.length - 15);
 
-    // Si cortamos justo en un "functionResponse" (User), la IA explotará (Error 400) 
-    // porque perdimos el "functionCall" (Model) previo. Así que retrocedemos uno.
-    while (startIndex > 0 && history[startIndex].parts && history[startIndex].parts.some(p => p.functionResponse)) {
+    // El historial DEBE empezar con un rol 'user' obligatoriamente.
+    // Además, si caemos en un 'user' que es un `functionResponse`, nos faltará
+    // su respectivo `functionCall` (del model) previo. 
+    // Por eso, retrocedemos hasta encontrar un rol 'user' que NO sea una respuesta de función.
+    while (
+      startIndex > 0 &&
+      (history[startIndex].role !== 'user' ||
+        (history[startIndex].parts && history[startIndex].parts.some(p => p.functionResponse)))
+    ) {
       startIndex--;
     }
 
