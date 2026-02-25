@@ -34,7 +34,7 @@ class AIService {
     4. Traspaso humano -> Solo si el cliente lo pide o está frustrado, usa 'transfer_to_human'.`;
 
     this.model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash", // Cambiado a 1.5 por estabilidad de cuota
+      model: "gemini-flash-latest", // Alias dinámico al mejor flash disponible
       tools: [tools],
       systemInstruction
     });
