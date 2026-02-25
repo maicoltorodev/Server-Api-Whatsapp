@@ -10,8 +10,11 @@ const app = express();
 
 // Middleware básico
 app.use(cors()); // Habilita peticiones cruzadas para el Dashboard (React/Vue/Angular)
-app.use(express.json());
-
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 // Rutas
 app.use('/', healthRoutes);
 app.use('/webhook', webhookRoutes);
