@@ -12,7 +12,7 @@ class AIService {
    * Inicializa el modelo con la instrucción de sistema dinámica
    */
   async initializeModel(leadData) {
-    console.log(`   [IA] Inicializando modelo Flash 2.0...`);
+    console.log(`   [IA] Inicializando modelo Flash (Latest)...`);
     const currentTime = new Date().toLocaleString("es-CO", { timeZone: config.TIMEZONE });
     const currentStage = leadData?.current_step || 'SALUDO';
     const userSummary = leadData?.summary || 'Nuevo cliente.';
@@ -64,6 +64,11 @@ class AIService {
     console.log(`   [IA] Enviando prompt: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
     const result = await chatSession.sendMessage(message);
 
+    const usage = result.response.usageMetadata;
+    if (usage) {
+      console.log(`   [IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+    }
+
     const calls = result.response.functionCalls();
     if (calls && calls.length > 0) {
       console.log(`   [IA] Gemini respondió con CALL: ${calls.map(c => c.name).join(', ')}`);
@@ -92,6 +97,11 @@ class AIService {
     const result = await chatSession.sendMessage([{
       functionResponse: { name: toolName, response: toolResult }
     }]);
+
+    const usage = result.response.usageMetadata;
+    if (usage) {
+      console.log(`   [IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+    }
 
     return {
       text: result.response.text(),
