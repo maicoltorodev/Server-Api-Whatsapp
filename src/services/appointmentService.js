@@ -73,7 +73,7 @@ class AppointmentService {
     const libres = [];
     let currentSlot = new Date(`${date}T${config.open}:00-05:00`);
     const closingTime = new Date(`${date}T${config.close}:00-05:00`);
-    const duration = parseInt(durationMinutes) || 60; // default a 60 si no envía
+    const duration = parseInt(durationMinutes) || config.defaultDuration || 60;
 
     // Obtener epoch crudo de la hora real
     const now = new Date();
@@ -179,17 +179,27 @@ class AppointmentService {
 
     const agendaConfig = await cacheManager.getAgendaConfig();
 
-    // Calcular horas exactas usando duración real
-    const exactStart = new Date(`${date}T${start_time}:00-05:00`);
-    const exactEnd = new Date(exactStart.getTime() + finalDuration * 60 * 1000);
-    const end_time = `${exactEnd.getHours().toString().padStart(2, '0')}:${exactEnd.getMinutes().toString().padStart(2, '0')}`;
+    // Función auxiliar para crear fecha en Bogotá (GMT-5) sin depender del sistema
+    const createBogotaDate = (d, t) => {
+      // t puede ser HH:mm o HH:mm:ss
+      const time = (t || "00:00").substring(0, 5);
+      return new Date(`${d}T${time}:00-05:00`);
+    };
 
-    // Verificar que no exceda el horario de cierre
-    const closingTime = new Date(`${date}T${agendaConfig.close}:00-05:00`);
-    if (exactEnd > closingTime) {
+    const exactStart = createBogotaDate(date, start_time);
+    const exactEnd = new Date(exactStart.getTime() + (finalDuration * 60 * 1000));
+    const closingTime = createBogotaDate(date, agendaConfig.close || "17:00");
+
+    // Para visualizar end_time correctamente en GMT-5 (BOG)
+    const bogotaClock = new Date(exactEnd.getTime() - (5 * 60 * 60 * 1000));
+    const end_time = `${bogotaClock.getUTCHours().toString().padStart(2, '0')}:${bogotaClock.getUTCMinutes().toString().padStart(2, '0')}`;
+
+    console.log(`   [DEBUG] Validando: Termina ${end_time} vs Cierre ${agendaConfig.close}`);
+
+    if (exactEnd.getTime() > closingTime.getTime()) {
       return {
         status: "error",
-        message: `La cita excede el horario de cierre (Dura ${finalDuration}mins).`
+        message: `La cita excede el horario de cierre. El estudio cierra a las ${agendaConfig.close}.`
       };
     }
 

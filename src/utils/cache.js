@@ -72,35 +72,76 @@ class CacheManager {
       if (!this.fetchAgendaPromise) {
         this.fetchAgendaPromise = (async () => {
           try {
-            const { data } = await supabase.from('site_content')
-              .select('key, value')
-              .in('key', ['agenda_open', 'agenda_close', 'agenda_buffer', 'agenda_concurrency', 'agenda_closed_days']);
+            // Buscamos en site_content y ai_settings para cobertura total
+            const [siteRes, aiRes] = await Promise.all([
+              supabase.from('site_content').select('key, value').in('key', ['site_name', 'agenda_open', 'agenda_close', 'agenda_buffer', 'agenda_concurrency', 'agenda_closed_days']),
+              supabase.from('ai_settings').select('key, value')
+            ]);
 
-            let configData = { ...config.BUSINESS_HOURS };
+            let configData = {
+              siteName: "Pet Care Studio",
+              open: config.BUSINESS_HOURS.open || "09:00",
+              close: config.BUSINESS_HOURS.close || "17:00",
+              buffer: config.BUSINESS_HOURS.buffer || 0,
+              concurrency: config.BUSINESS_HOURS.concurrency || 1,
+              closedDays: config.BUSINESS_HOURS.closedDays || [0],
+              business_hours_text: "",
+              closed_days_text: "",
+              defaultDuration: 60,
+              agentName: "Miel",
+              agentPersonality: "Amigable y profesional",
+              businessRules: "",
+              masterPrompt: ""
+            };
 
-            if (data && data.length > 0) {
-              data.forEach(item => {
-                if (item.key === 'agenda_open') configData.open = item.value || configData.open;
-                if (item.key === 'agenda_close') configData.close = item.value || configData.close;
-                if (item.key === 'agenda_buffer') configData.buffer = parseInt(item.value) || configData.buffer;
-                if (item.key === 'agenda_concurrency') configData.concurrency = parseInt(item.value) || configData.concurrency;
-                if (item.key === 'agenda_closed_days') {
+            // 1. Procesar site_content
+            if (siteRes.data) {
+              siteRes.data.forEach(item => {
+                const key = item.key.toLowerCase();
+                if (key === 'site_name') configData.siteName = item.value || configData.siteName;
+                if (key === 'agenda_open') configData.open = item.value || configData.open;
+                if (key === 'agenda_close') configData.close = item.value || configData.close;
+                if (key === 'agenda_buffer') configData.buffer = parseInt(item.value) || configData.buffer;
+                if (key === 'agenda_concurrency') configData.concurrency = parseInt(item.value) || configData.concurrency;
+                if (key === 'agenda_closed_days') {
                   if (item.value && item.value.trim() !== "") {
                     configData.closedDays = item.value.split(',').map(d => parseInt(d.trim()));
-                  } else {
-                    configData.closedDays = [];
                   }
                 }
               });
             }
+
+            // 2. Procesar ai_settings
+            if (aiRes.data) {
+              aiRes.data.forEach(item => {
+                const key = item.key.toLowerCase();
+                if (key === 'business_hours') configData.business_hours_text = item.value;
+                if (key === 'closed_days') configData.closed_days_text = item.value;
+                if (key === 'agent_name') configData.agentName = item.value;
+                if (key === 'agent_personality') configData.agentPersonality = item.value;
+                if (key === 'business_rules') configData.businessRules = item.value;
+                if (key === 'bot_system_prompt') configData.masterPrompt = item.value;
+
+                // Lógica prioritaria
+                if (key === 'agenda_open') configData.open = item.value || configData.open;
+                if (key === 'agenda_close') configData.close = item.value || configData.close;
+                if (key === 'simultaneous_appointments') configData.concurrency = parseInt(item.value) || configData.concurrency;
+                if (key === 'agenda_buffer') configData.buffer = parseInt(item.value) || configData.buffer;
+                if (key === 'appointment_duration_minutes') configData.defaultDuration = parseInt(item.value) || configData.defaultDuration;
+                if (key === 'max_daily_appointments') configData.maxDaily = parseInt(item.value) || 8;
+                if (key === 'agenda_closed_days') {
+                  if (item.value && item.value.trim() !== "") {
+                    configData.closedDays = item.value.split(',').map(d => parseInt(d.trim()));
+                  }
+                }
+              });
+            }
+
             this.agendaConfigCache = configData;
             this.lastAgendaConfigFetch = Date.now();
           } catch (error) {
             console.error("Error fetching agenda config:", error);
-            // Si hay error, devolvemos la configuración por defecto
-            if (!this.agendaConfigCache) {
-              this.agendaConfigCache = { ...config.BUSINESS_HOURS };
-            }
+            if (!this.agendaConfigCache) this.agendaConfigCache = { ...config.BUSINESS_HOURS };
           } finally {
             this.fetchAgendaPromise = null;
           }
@@ -123,6 +164,16 @@ class CacheManager {
    */
   invalidateAgendaConfigCache() {
     this.lastAgendaConfigFetch = 0;
+  }
+  /**
+   * Invalida los caches para forzar una nueva lectura de la BD
+   */
+  invalidateConfig() {
+    this.catalogCache = null;
+    this.agendaConfigCache = null;
+    this.lastCatalogFetch = 0;
+    this.lastAgendaConfigFetch = 0;
+    console.log("♻️ Cache de configuración invalidado.");
   }
 }
 

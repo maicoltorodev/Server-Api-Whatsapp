@@ -17,9 +17,13 @@ class AIService {
     const currentStage = leadData?.current_step || 'SALUDO';
     const userSummary = leadData?.summary || 'Nuevo cliente.';
     const servicesCatalog = await cacheManager.getCatalog();
+    const agendaConfig = await cacheManager.getAgendaConfig();
+
     console.log(`   [IA] Contexto: Etapa=${currentStage} | Resumen: ${userSummary.substring(0, 30)}...`);
 
-    const systemInstruction = `Eres "Miel", la asistente virtual de "Pet Care Studio". 
+    const systemInstruction = `Eres "${agendaConfig.agentName || 'Miel'}", la asistente virtual de "${agendaConfig.siteName || 'Pet Care Studio'}". 
+    PERSONALIDAD: ${agendaConfig.agentPersonality || 'Amigable, profesional y apasionada por las mascotas.'}
+    
     🗓️ HORA ACTUAL: ${currentTime}
     ESTADO CLIENTE: ${currentStage}. 
     RESUMEN CLIENTE: ${userSummary}.
@@ -27,6 +31,16 @@ class AIService {
     SERVICIOS DISPONIBLES:
     ${servicesCatalog}
     
+    HORARIOS DE ATENCIÓN:
+    ${agendaConfig.business_hours_text || '- Lunes a Sábado: 09:00 AM a 05:00 PM (17:00).'}
+    ${agendaConfig.closed_days_text ? `\nDÍAS CERRADOS:\n${agendaConfig.closed_days_text}` : '\n- Domingos: Cerrado.'}
+    
+    REGLAS DE NEGOCIO EN EL ESTUDIO:
+    ${agendaConfig.businessRules || 'Tratar a cada mascota con amor.'}
+    
+    INSTRUCCIONES MAESTRAS:
+    ${agendaConfig.masterPrompt || 'Tu objetivo es ayudar al cliente a agendar citas y resolver dudas. Sé concisa y amable.'}
+
     REGLAS DE ORO (OBLIGATORIAS):
     1. PROHIBIDO decir "Déjame revisar", "Dame un momento", "Ya te confirmo" o similares. Tienes acceso instantáneo a la agenda.
     2. Si necesitas verificar algo (como disponibilidad), ejecuta 'check_availability' DE INMEDIATO y responde directamente con el resultado que recibas.
@@ -144,34 +158,32 @@ class AIService {
       sanitized.pop();
     }
 
-    // 2. Limitar tamaño pero asegurando que SIEMPRE empiece con 'user' y 
-    // no rompa bloques de functionCall (que son model -> user/functionResponse)
+    // 2. Limitar tamaño
     const MAX_HISTORY = 12;
     if (sanitized.length > MAX_HISTORY) {
       sanitized = sanitized.slice(-MAX_HISTORY);
     }
 
-    // Asegurar que el primer mensaje del historial sea 'user'
-    while (sanitized.length > 0 && sanitized[0].role !== 'user') {
-      sanitized.shift();
+    // Asegurar que el primer mensaje sea 'user'
+    let sliceIndex = 0;
+    while (sliceIndex < sanitized.length && sanitized[sliceIndex].role !== 'user') {
+      sliceIndex++;
     }
+    const finalHistory = sanitized.slice(sliceIndex);
 
     // 3. Verificación de alternancia Gemini (user, model, user, model...)
-    // Si hay dos mensajes seguidos del mismo rol, Gemini fallará.
-    const finalHistory = [];
-    for (const msg of sanitized) {
-      if (finalHistory.length > 0 && finalHistory[finalHistory.length - 1].role === msg.role) {
-        // Si hay duplicado de rol, fusionamos el texto o ignoramos
-        console.log(`   [IA] Sanitización: Fusionando mensajes duplicados de rol ${msg.role}`);
-        if (msg.parts && msg.parts[0] && msg.parts[0].text) {
-          finalHistory[finalHistory.length - 1].parts[0].text += " " + msg.parts[0].text;
+    const alternatingHistory = [];
+    for (const msg of finalHistory) {
+      if (alternatingHistory.length > 0 && alternatingHistory[alternatingHistory.length - 1].role === msg.role) {
+        if (msg.role === 'user' && msg.parts && msg.parts[0] && msg.parts[0].text) {
+          alternatingHistory[alternatingHistory.length - 1].parts[0].text += " " + msg.parts[0].text;
         }
       } else {
-        finalHistory.push(msg);
+        alternatingHistory.push(msg);
       }
     }
 
-    return finalHistory;
+    return alternatingHistory;
   }
 }
 

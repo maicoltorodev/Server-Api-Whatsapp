@@ -92,6 +92,20 @@ class AdminController {
     }
 
     /**
+     * Invalida el cache del servidor para que la IA lea la nueva config de Supabase
+     */
+    async refreshConfig(req, res) {
+        try {
+            const cacheManager = require('../utils/cache');
+            cacheManager.invalidateConfig();
+            res.json({ status: 'success', message: 'Cache refrescado con éxito.' });
+        } catch (error) {
+            console.error("Dashboard Error (refreshConfig):", error.message);
+            res.status(500).json({ status: 'error', message: 'Error al invalidar cache' });
+        }
+    }
+
+    /**
      * SSE Endpoint (Server-Sent Events para el Dashboard React/Vue)
      */
     streamEvents(req, res) {
