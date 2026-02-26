@@ -39,11 +39,11 @@ const config = {
 
   // Business Configuration
   BUSINESS_HOURS: {
-    OPEN: "09:00",
-    CLOSE: "17:00",
-    BUFFER: 15, // minutes
-    CONCURRENCY: 1,
-    CLOSED_DAYS: [0] // 0 = Sunday
+    open: "09:00",
+    close: "17:00",
+    buffer: 15, // minutes
+    concurrency: 1,
+    closedDays: [0] // 0 = Sunday
   },
 
   // Timezone

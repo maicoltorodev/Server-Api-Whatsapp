@@ -78,12 +78,12 @@ class CacheManager {
 
             let configData = { ...config.BUSINESS_HOURS };
 
-            if (data) {
+            if (data && data.length > 0) {
               data.forEach(item => {
-                if (item.key === 'agenda_open') configData.open = item.value || "09:00";
-                if (item.key === 'agenda_close') configData.close = item.value || "17:00";
-                if (item.key === 'agenda_buffer') configData.buffer = parseInt(item.value) || 0;
-                if (item.key === 'agenda_concurrency') configData.concurrency = parseInt(item.value) || 1;
+                if (item.key === 'agenda_open') configData.open = item.value || configData.open;
+                if (item.key === 'agenda_close') configData.close = item.value || configData.close;
+                if (item.key === 'agenda_buffer') configData.buffer = parseInt(item.value) || configData.buffer;
+                if (item.key === 'agenda_concurrency') configData.concurrency = parseInt(item.value) || configData.concurrency;
                 if (item.key === 'agenda_closed_days') {
                   if (item.value && item.value.trim() !== "") {
                     configData.closedDays = item.value.split(',').map(d => parseInt(d.trim()));

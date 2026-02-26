@@ -21,7 +21,8 @@ class AppointmentService {
     const checkDate = new Date(`${date}T12:00:00-05:00`);
 
     // Verificar si es un día cerrado
-    if (agendaConfig.closedDays.includes(checkDate.getDay())) {
+    const closedDays = agendaConfig.closedDays || [];
+    if (closedDays.includes(checkDate.getDay())) {
       return {
         status: "error",
         message: `Lo siento, los días de la fecha solicitada nuestro estudio está cerrado.`
@@ -97,9 +98,13 @@ class AppointmentService {
       // Verificar solapamientos para todo el intervalo de [testStart a testEnd]
       let overlappingCount = 0;
       existingAppointments.forEach(appointment => {
-        const aStart = new Date(`${date}T${appointment.start_time}:00-05:00`);
-        const aEnd = new Date(`${date}T${appointment.end_time}:00-05:00`);
-        const aEndWithBuffer = new Date(aEnd.getTime() + config.buffer * 60 * 1000);
+        // Normalizar tiempos de bbd (a veces vienen HH:mm:ss)
+        const sTime = appointment.start_time.substring(0, 5);
+        const eTime = appointment.end_time.substring(0, 5);
+
+        const aStart = new Date(`${date}T${sTime}:00-05:00`);
+        const aEnd = new Date(`${date}T${eTime}:00-05:00`);
+        const aEndWithBuffer = new Date(aEnd.getTime() + (config.buffer || 0) * 60 * 1000);
 
         // Si hay cualquier intersección en el rango de tiempo
         if (testStart < aEndWithBuffer && testEnd > aStart) {
