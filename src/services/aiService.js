@@ -21,7 +21,7 @@ class AIService {
 
     console.log(`   [IA] Contexto: Etapa=${currentStage} | Resumen: ${userSummary.substring(0, 30)}...`);
 
-    const systemInstruction = `Eres "${agendaConfig.agentName || 'Miel'}", la asistente virtual de "${agendaConfig.siteName || 'Pet Care Studio'}". 
+    const systemInstruction = `Eres "${agendaConfig.agentName || 'Asistente'}", la asistente virtual de "${agendaConfig.siteName || 'Pet Care Studio'}". 
     PERSONALIDAD: ${agendaConfig.agentPersonality || 'Amigable, profesional y apasionada por las mascotas.'}
     
     🗓️ HORA ACTUAL: ${currentTime}

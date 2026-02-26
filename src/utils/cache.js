@@ -88,7 +88,7 @@ class CacheManager {
               business_hours_text: "",
               closed_days_text: "",
               defaultDuration: 60,
-              agentName: "Miel",
+              agentName: "Asistente",
               agentPersonality: "Amigable y profesional",
               businessRules: "",
               masterPrompt: ""
