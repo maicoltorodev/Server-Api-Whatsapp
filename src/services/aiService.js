@@ -84,58 +84,91 @@ class AIService {
   }
 
   /**
-   * Orquesta la ejecución de herramientas y continúa la charla
+   * Orquesta la ejecución de varias herramientas en bucle hasta obtener texto
    */
-  async processFunctionCall(call, chatSession, phone) {
-    const toolName = call.name;
-    const args = call.args;
+  async processFunctionCalls(calls, chatSession, phone) {
+    let currentCalls = calls;
+    let finalResponse = { text: "", chatSession };
 
-    // Ejecutar la lógica de la herramienta
-    const toolResult = await toolService[toolName](args, phone);
+    // Bucle para manejar function calls anidados o múltiples
+    while (currentCalls && currentCalls.length > 0) {
+      const toolResponses = [];
 
-    // Enviar el resultado de vuelta a la IA para que formule la respuesta final
-    const result = await chatSession.sendMessage([{
-      functionResponse: { name: toolName, response: toolResult }
-    }]);
+      for (const call of currentCalls) {
+        const toolName = call.name;
+        const args = call.args;
+        console.log(`   [TOOL] Executing: ${toolName} para ${phone}`);
 
-    const usage = result.response.usageMetadata;
-    if (usage) {
-      console.log(`   [IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+        try {
+          const toolResult = await toolService[toolName](args, phone);
+          toolResponses.push({
+            functionResponse: { name: toolName, response: toolResult }
+          });
+        } catch (error) {
+          console.error(`   [TOOL] Error fatal en ${toolName}:`, error.message);
+          toolResponses.push({
+            functionResponse: { name: toolName, response: { status: "error", message: "Error interno ejecutando herramienta." } }
+          });
+        }
+      }
+
+      // Enviar todos los resultados de una vez
+      const result = await chatSession.sendMessage(toolResponses);
+
+      const usage = result.response.usageMetadata;
+      if (usage) {
+        console.log(`   [IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+      }
+
+      finalResponse.text = result.response.text();
+      currentCalls = result.response.functionCalls();
+
+      if (currentCalls && currentCalls.length > 0) {
+        console.log(`   [IA] Gemini pidió más llamadas: ${currentCalls.map(c => c.name).join(', ')}`);
+      }
     }
 
-    return {
-      text: result.response.text(),
-      chatSession
-    };
+    return finalResponse;
   }
 
-  /**
-   * Limpia el historial para cumplir con los requisitos de la API de Gemini
-   */
   _sanitizeHistory(history) {
     if (history.length === 0) return [];
 
-    // 1. Gemini requiere que el historial sea alternado (user, model, user, model...)
-    // 2. IMPORTANTE: Como el mensaje actual lo enviaremos con .sendMessage(message), 
-    //    el historial que le pasamos a .startChat NO debe terminar en 'user'.
-    //    Si termina en 'user', Gemini dará error porque esperaría un mensaje del 'model'.
-
     let sanitized = [...history];
 
-    // Si el último mensaje es del usuario, lo quitamos del historial de inicio 
-    // porque es el que vamos a enviar en el prompt actual.
+    // 1. Quitar el último si es del usuario (porque se enviará en el prompt actual)
     if (sanitized.length > 0 && sanitized[sanitized.length - 1].role === 'user') {
-      console.log(`   [IA] Historial ajustado: quitando último mensaje 'user' para evitar error de alternancia.`);
+      console.log(`   [IA] Historial ajustado: quitando último mensaje 'user' para evitar duplicidad.`);
       sanitized.pop();
     }
 
-    // Asegurarnos de que empiece por 'user' (si queda algo)
-    let startIndex = 0;
-    while (startIndex < sanitized.length && sanitized[startIndex].role !== 'user') {
-      startIndex++;
+    // 2. Limitar tamaño pero asegurando que SIEMPRE empiece con 'user' y 
+    // no rompa bloques de functionCall (que son model -> user/functionResponse)
+    const MAX_HISTORY = 12;
+    if (sanitized.length > MAX_HISTORY) {
+      sanitized = sanitized.slice(-MAX_HISTORY);
     }
 
-    const finalHistory = sanitized.slice(startIndex).slice(-10); // Mantener solo los últimos 10 de contexto
+    // Asegurar que el primer mensaje del historial sea 'user'
+    while (sanitized.length > 0 && sanitized[0].role !== 'user') {
+      sanitized.shift();
+    }
+
+    // 3. Verificación de alternancia Gemini (user, model, user, model...)
+    // Si hay dos mensajes seguidos del mismo rol, Gemini fallará.
+    const finalHistory = [];
+    for (const msg of sanitized) {
+      if (finalHistory.length > 0 && finalHistory[finalHistory.length - 1].role === msg.role) {
+        // Si hay duplicado de rol, fusionamos el texto o ignoramos
+        console.log(`   [IA] Sanitización: Fusionando mensajes duplicados de rol ${msg.role}`);
+        if (msg.parts && msg.parts[0] && msg.parts[0].text) {
+          finalHistory[finalHistory.length - 1].parts[0].text += " " + msg.parts[0].text;
+        }
+      } else {
+        finalHistory.push(msg);
+      }
+    }
+
     return finalHistory;
   }
 }

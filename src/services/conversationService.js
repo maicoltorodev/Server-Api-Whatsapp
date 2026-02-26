@@ -68,14 +68,19 @@ class ConversationService {
 
       // C. Manejar Function Calls (si existen)
       if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
-        console.log(`🛠️ La IA solicitó ejecutar una herramienta: ${aiResponse.functionCalls[0].name}`);
-        const call = aiResponse.functionCalls[0];
-        const result = await aiService.processFunctionCall(call, aiResponse.chatSession, phone, leadData);
+        console.log(`🛠️ La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map(c => c.name).join(', ')}`);
+        const result = await aiService.processFunctionCalls(aiResponse.functionCalls, aiResponse.chatSession, phone);
         responseText = result.text;
-        console.log(`✅ Herramienta ejecutada. Respuesta final de IA obtenida.`);
+        console.log(`✅ Herramientas ejecutadas. Respuesta final de IA obtenida.`);
       } else {
         console.log(`💬 La IA generó una respuesta de texto directa.`);
         responseText = aiResponse.text;
+      }
+
+      // Validación de seguridad para evitar enviar mensajes vacíos a WhatsApp
+      if (!responseText || responseText.trim() === "") {
+        console.warn(`⚠️ La IA no devolvió texto. Usando respuesta amigable por defecto.`);
+        responseText = "¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾";
       }
 
       // D. Persistir cambios de la sesión (historial con respuesta IA)
