@@ -78,7 +78,7 @@ class LeadModel {
   }
 
   /**
-   * Actualiza el resumen del lead
+   * Actualiza el resumen del lead (Corto plazo)
    */
   async updateSummary(phone, summary) {
     const lead = await this.getByPhone(phone);
@@ -88,6 +88,30 @@ class LeadModel {
       : (summary || previousSummary);
 
     return await this.updateStatus(phone, { summary: finalSummary });
+  }
+
+  /**
+   * Actualiza un fragmento específico del Historial Médico (Largo plazo)
+   */
+  async updateMedicalHistory(phone, category, value) {
+    const lead = await this.getByPhone(phone);
+
+    // Extraer historial actual o inicializar objeto vacío
+    let history = lead?.medical_history || {};
+
+    // Si la categoría contiene un arreglo (ej: allergies)
+    if (['allergies', 'preferences'].includes(category)) {
+      if (!history[category]) history[category] = [];
+      // Agregar sin duplicar
+      if (!history[category].includes(value)) {
+        history[category].push(value);
+      }
+    } else {
+      // Modificar directamente (comportamiento, notas, etc)
+      history[category] = value;
+    }
+
+    return await this.updateStatus(phone, { medical_history: history });
   }
 }
 

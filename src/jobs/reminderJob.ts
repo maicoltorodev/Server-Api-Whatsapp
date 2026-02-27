@@ -4,6 +4,8 @@ const notificationService = require('../services/notificationService');
 const config = require('../config');
 
 class ReminderJob {
+  isScheduled: boolean;
+
   constructor() {
     this.isScheduled = false;
   }

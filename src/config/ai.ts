@@ -23,7 +23,7 @@ const tools = {
     },
     {
       name: "check_availability",
-      description: "Verifica si hay turnos disponibles para agendar un servicio en una fecha u hora específica para el Pet Care Studio.",
+      description: "HERRAMIENTA OBLIGATORIA: Úsala CADA VEZ que el cliente pregunte si hay cupo, si pueden atender a su mascota, o solicite un turno. JAMÁS respondas 'déjame revisar' sin usar esta herramienta. Verifica en tiempo real los espacios libres en la agenda del estudio.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -36,7 +36,7 @@ const tools = {
     },
     {
       name: "book_appointment",
-      description: "Agendar o separar definitivamente una cita confirmada por el cliente. Solo úsalo si el cliente ya confirmó el día y la hora exacta.",
+      description: "HERRAMIENTA FINAL DE CIERRE: Agendar o separar definitivamente una cita confirmada por el cliente. REQUISITO ESTRICTO: Solo úsala si el cliente ya confirmó explícitamente el día EXACTO y la hora EXACTA tras haberle mostrado la disponibilidad.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -51,7 +51,7 @@ const tools = {
     },
     {
       name: "cancel_appointment",
-      description: "Cancela una cita existente. Solo úsalo si el cliente pide explícitamente cancelar su turno.",
+      description: "ACCIÓN DE CANCELACIÓN: Cancela una cita existente. REQUISITO: Solo úsala si el cliente pide de forma directa y explícita cancelar o anular su turno previamente agendado.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -62,13 +62,25 @@ const tools = {
     },
     {
       name: "transfer_to_human",
-      description: "Transfiere la conversación del cliente inmediatamente a un agente humano en caso de que esté enojado, frustrado o pida explícitamente hablar con una persona.",
+      description: "ACCIÓN DE ESCAPE: Transfiere la conversación del cliente inmediatamente a un agente humano. ÚSALA SI: 1. El cliente está enojado, frustrado o indispuesto. 2. Pide explícitamente hablar con una persona/asesor real. 3. El caso es muy complejo o no está en el catálogo.",
       parameters: {
         type: "OBJECT",
         properties: {
           reason: { type: "STRING", description: "Breve razón o motivo de por qué de la transferencia (ej: cliente enojado, caso complejo, pidió humano explícitamente)." }
         },
         required: ["reason"]
+      }
+    },
+    {
+      name: "save_pet_preference",
+      description: "HERRAMIENTA DE MEMORIA PERMANENTE. Úsala INMEDIATAMENTE cuando el cliente mencione un dato vital o preferencia a largo plazo (alergias, comportamientos de la mascota, disgustos, raza). Esto se guardará en su ficha clínica y lo recordarás para siempre.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          category: { type: "STRING", enum: ["allergies", "behavior", "preferences", "notes"], description: "Categoría del historial." },
+          value: { type: "STRING", description: "El dato a guardar (ej. 'Alergia al pollo', 'Nervioso con secadora', 'Poodle')." }
+        },
+        required: ["category", "value"]
       }
     }
   ]

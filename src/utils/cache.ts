@@ -2,6 +2,16 @@ const config = require('../config');
 const supabase = require('../config/database');
 
 class CacheManager {
+  catalogString: string;
+  catalogArray: any[];
+  lastCatalogFetch: number;
+  fetchCatalogPromise: any;
+  catalogCache: any;
+
+  agendaConfigCache: any;
+  lastAgendaConfigFetch: number;
+  fetchAgendaPromise: any;
+
   constructor() {
     this.catalogString = "";
     this.catalogArray = [];
@@ -78,7 +88,7 @@ class CacheManager {
               supabase.from('ai_settings').select('key, value')
             ]);
 
-            let configData = {
+            let configData: any = {
               siteName: "Pet Care Studio",
               open: config.BUSINESS_HOURS.open || "09:00",
               close: config.BUSINESS_HOURS.close || "17:00",

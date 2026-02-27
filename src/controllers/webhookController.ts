@@ -4,6 +4,7 @@ const leadModel = require('../models/leadModel');
 const notificationService = require('../services/notificationService');
 const rateLimiter = require('../middleware/rateLimit');
 const config = require('../config');
+const messageQueue = require('../utils/messageQueue');
 
 class WebhookController {
   /**
@@ -60,9 +61,9 @@ class WebhookController {
         return;
       }
 
-      // 5. Delegar el resto a ConversationService
-      console.log(`➡️ Delegando conversación a ConversationService...`);
-      await conversationService.handleIncomingMessage(from, text);
+      // 5. Delegar a la Cola de Espera (Debounce de 3s)
+      console.log(`➡️ Poniendo el mensaje en espera (Embudo Antispam de 3s)...`);
+      messageQueue.enqueueMessage(from, text);
 
     } catch (error) {
       console.error("🔥 Error crítico en WebhookController:", error.message);

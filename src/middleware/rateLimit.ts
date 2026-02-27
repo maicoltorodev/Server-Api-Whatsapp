@@ -1,6 +1,9 @@
 const config = require('../config');
 
 class RateLimiter {
+  processedMessages: Set<any>;
+  userMessageCount: Map<any, any>;
+
   constructor() {
     this.processedMessages = new Set();
     this.userMessageCount = new Map();

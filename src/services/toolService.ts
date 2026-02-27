@@ -80,6 +80,26 @@ class ToolService {
             message: "Se ha notificado a un agente humano. El bot ha sido desactivado para este chat."
         };
     }
+
+    /**
+     * Memoria a largo plazo - Guarda información permanente de la mascota
+     */
+    async save_pet_preference(args, phone) {
+        console.log(`🧠 [TOOL] EXECUTING: save_pet_preference for ${phone}`);
+        console.log(`🧠 [TOOL] Args:`, JSON.stringify(args));
+        try {
+            const { category, value } = args;
+            await leadModel.updateMedicalHistory(phone, category, value);
+            console.log(`🧠 [TOOL] Success: Preference saved in medical_history.`);
+            return {
+                status: "saved",
+                message: `Dato guardado permanentemente en la categoría '${category}'. Ahora lo recordarás siempre.`
+            };
+        } catch (error) {
+            console.error(`🧠 [TOOL] Error saving preference:`, error.message);
+            return { status: "error", message: "Fallo al guardar el historial médico." };
+        }
+    }
 }
 
 module.exports = new ToolService();

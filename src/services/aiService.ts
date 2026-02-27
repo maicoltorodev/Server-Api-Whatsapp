@@ -4,6 +4,8 @@ const config = require('../config');
 const toolService = require('./toolService');
 
 class AIService {
+  model: any;
+
   constructor() {
     this.model = null;
   }
@@ -16,6 +18,10 @@ class AIService {
     const currentTime = new Date().toLocaleString("es-CO", { timeZone: config.TIMEZONE });
     const currentStage = leadData?.current_step || 'SALUDO';
     const userSummary = leadData?.summary || 'Nuevo cliente.';
+
+    // Parsear stringificación del JSONB si es necesario
+    const medicalHistory = leadData?.medical_history ? JSON.stringify(leadData.medical_history, null, 2) : 'Ninguno registrado aún.';
+
     const servicesCatalog = await cacheManager.getCatalog();
     const agendaConfig = await cacheManager.getAgendaConfig();
 
@@ -26,7 +32,12 @@ class AIService {
     
     🗓️ HORA ACTUAL: ${currentTime}
     ESTADO CLIENTE: ${currentStage}. 
-    RESUMEN CLIENTE: ${userSummary}.
+    RESUMEN RECIENTE (Chat Corto Plazo): ${userSummary}.
+
+    🧠 FICHA CLÍNICA & PREFERENCIAS (Memoria a Largo Plazo):
+    ${medicalHistory}
+    (Usa OBLIGATORIAMENTE esta información clínica/preferencial antes de ofrecer servicios, alertando si hay incompatibilidades como alergias).
+
     
     SERVICIOS DISPONIBLES:
     ${servicesCatalog}

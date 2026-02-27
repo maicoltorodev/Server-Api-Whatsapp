@@ -3,6 +3,9 @@ const config = require('../config');
 const { isValidWhatsAppMessage } = require('../utils/validators');
 
 class WhatsAppService {
+  baseUrl: string;
+  headers: any;
+
   constructor() {
     this.baseUrl = `https://graph.facebook.com/v22.0/${config.PHONE_NUMBER_ID}/messages`;
     this.headers = {
