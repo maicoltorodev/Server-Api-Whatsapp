@@ -79,14 +79,7 @@ class LeadModel {
    * Actualiza el resumen del lead (Corto plazo)
    */
   async updateSummary(phone, summary) {
-    const lead = await this.getByPhone(phone);
-    const previousSummary = lead?.summary || '';
-    const finalSummary =
-      previousSummary && summary && !previousSummary.includes(summary)
-        ? `${previousSummary} | ${summary}`
-        : summary || previousSummary;
-
-    return await this.updateStatus(phone, { summary: finalSummary });
+    return await this.updateStatus(phone, { summary });
   }
 
   /**

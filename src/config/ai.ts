@@ -17,7 +17,7 @@ const tools = {
           appointment_date: { type: 'STRING' },
           budget: { type: 'STRING' },
           current_step: { type: 'STRING', enum: ['SALUDO', 'CALIFICACION', 'AGENDA', 'CIERRE'] },
-          summary: { type: 'STRING', description: 'Resumen ejecutivo actualizado.' },
+          summary: { type: 'STRING', description: 'Breve síntesis del hilo ACTUAL de la conversación (ej: "Cotizando baño para perro mediano. Esperando fecha"). NO acumules historial viejo, enfócate en la acción en curso.' },
         },
       },
     },
