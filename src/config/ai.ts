@@ -41,23 +41,24 @@ const tools = {
         type: "OBJECT",
         properties: {
           service: { type: "STRING", description: "El servicio a agendar (ej. Baño, Peluquería)" },
-          pet_name: { type: "STRING", description: "Nombre de la mascota (si se sabe)", nullable: true },
+          pet_name: { type: "STRING", description: "Nombre EXACTO de la mascota a agendar. NUNCA agrupes múltiples nombres (ej. usa 'Ñapa', NUNCA 'Ñapa y Embale')." },
           date: { type: "STRING", description: "Fecha confirmada (formato YYYY-MM-DD)" },
           start_time: { type: "STRING", description: "Hora de inicio confirmada (formato HH:MM)" },
           duration_minutes: { type: "INTEGER", description: "Duración en minutos según el catálogo." }
         },
-        required: ["service", "date", "start_time", "duration_minutes"]
+        required: ["service", "pet_name", "date", "start_time", "duration_minutes"]
       }
     },
     {
       name: "cancel_appointment",
-      description: "ACCIÓN DE CANCELACIÓN: Cancela una cita existente. REQUISITO: Solo úsala si el cliente pide de forma directa y explícita cancelar o anular su turno previamente agendado.",
+      description: "ACCIÓN DE CANCELACIÓN: Cancela una cita existente. ÚSALA CUANDO: 1. El cliente pide cancelar directamente. 2. Vas a reagendar a un cliente a una nueva hora o día, DEBES cancelar primero la cita original. 3. Si por error reservas algo mal y quieres corregirlo.",
       parameters: {
         type: "OBJECT",
         properties: {
-          date: { type: "STRING", description: "Fecha de la cita a cancelar (formato YYYY-MM-DD)" }
+          date: { type: "STRING", description: "Fecha de la cita a cancelar (formato YYYY-MM-DD)" },
+          start_time: { type: "STRING", description: "Hora exacta de la cita a cancelar (formato HH:MM). OBLIGATORIO para no cancelar la cita equivocada de ese día." }
         },
-        required: ["date"]
+        required: ["date", "start_time"]
       }
     },
     {

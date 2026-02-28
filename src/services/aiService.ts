@@ -66,18 +66,9 @@ class AIService {
 
     logger.info(`[IA] Enviando prompt: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
 
-    let result;
-    try {
-      logger.info("[DEBUG] Ejecutando chatSession.sendMessage...");
-      result = await Promise.race([
-        chatSession.sendMessage(message),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de 20s en Gemini API")), 20000))
-      ]);
-      logger.info("[DEBUG] chatSession.sendMessage finalizado con éxito.");
-    } catch (apiError: any) {
-      logger.error(`[IA] Error en Gemini API durante sendMessage: ${apiError.message}`, { error: apiError });
-      throw apiError;
-    }
+    const result = await this._withRetry(async () => {
+      return await chatSession.sendMessage(message);
+    });
 
     const usage = result?.response?.usageMetadata;
     if (usage) {
@@ -127,8 +118,10 @@ class AIService {
         }
       }
 
-      // Enviar todos los resultados de una vez
-      const result = await chatSession.sendMessage(toolResponses);
+      // Enviar todos los resultados de una vez con reintentos
+      const result = await this._withRetry(async () => {
+        return await chatSession.sendMessage(toolResponses);
+      });
 
       const usage = result.response.usageMetadata;
       if (usage) {
@@ -183,6 +176,34 @@ class AIService {
     }
 
     return alternatingHistory;
+  }
+
+  /**
+   * Envuelve una promesa con lógica de reintento exponencial
+   */
+  private async _withRetry(fn: any, maxRetries = 3) {
+    let lastError;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        // Race contra un timeout de 20s
+        return await Promise.race([
+          fn(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de 20s en Gemini API")), 20000))
+        ]);
+      } catch (error: any) {
+        lastError = error;
+        // Solo reintentar si es un error de red o sobrecarga (500, 503, 429) o timeout
+        const errorMsg = error.message?.toLowerCase() || "";
+        const shouldRetry = errorMsg.includes('timeout') || errorMsg.includes('fetch') || errorMsg.includes('503') || errorMsg.includes('429');
+
+        if (!shouldRetry || i === maxRetries - 1) break;
+
+        const delay = Math.pow(2, i) * 1000;
+        logger.warn(`[IA] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, { error: error.message });
+        await new Promise(res => setTimeout(res, delay));
+      }
+    }
+    throw lastError;
   }
 }
 

@@ -49,6 +49,23 @@ class ConcurrencyQueue {
             this.processNext();
         }
     }
+
+    /**
+     * Espera a que la cola esté vacía (Para apagar el servidor sin perder datos)
+     */
+    public async waitForEmpty(): Promise<void> {
+        if (this.running === 0 && this.queue.length === 0) return;
+        return new Promise(resolve => {
+            const check = () => {
+                if (this.running === 0 && this.queue.length === 0) {
+                    resolve();
+                } else {
+                    setTimeout(check, 100);
+                }
+            };
+            check();
+        });
+    }
 }
 
 export default new ConcurrencyQueue(3); // Solo permitimos 3 chats con IA procesándose al mismo tiempo

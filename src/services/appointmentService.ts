@@ -141,6 +141,22 @@ class AppointmentService {
       };
     }
 
+    if (!pet_name || pet_name.trim() === '') {
+      return {
+        status: "error",
+        message: "Nombre de la mascota no proporcionado. Debes preguntar y registrar el nombre exacto de la mascota."
+      };
+    }
+
+    // Validación Anti-Quimera (Detectar intentos de colar varias mascotas en 1 string)
+    const petNameLower = pet_name.toLowerCase();
+    if (petNameLower.includes(' y ') || petNameLower.includes(' e ') || petNameLower.includes(' and ') || petNameLower.includes(',')) {
+      return {
+        status: "error",
+        message: "Prohibido agrupar múltiples mascotas en un solo turno. Debes ejecutar 'book_appointment' una vez MÁS por cada mascota separadamente."
+      };
+    }
+
     if (!isFutureDate(date)) {
       return {
         status: "error",
@@ -277,7 +293,7 @@ class AppointmentService {
   /**
    * Cancela una cita existente
    */
-  async cancelAppointment(phone, { date }) {
+  async cancelAppointment(phone, { date, start_time }) {
     if (!isValidDate(date)) {
       return {
         status: "error",
@@ -285,13 +301,26 @@ class AppointmentService {
       };
     }
 
+    if (!isValidTime(start_time)) {
+      return {
+        status: "error",
+        message: "Hora inválida o no proporcionada (usa HH:MM). Es OBLIGATORIO proveer la hora exacta de la cita a cancelar."
+      };
+    }
+
     try {
-      const { data: appointments, error } = await supabase
+      let query = supabase
         .from('appointments')
         .select('*')
         .eq('phone', phone)
         .eq('appointment_date', date)
-        .neq('status', 'cancelada')
+        .neq('status', 'cancelada');
+
+      if (start_time) {
+        query = query.eq('start_time', start_time);
+      }
+
+      const { data: appointments, error } = await query
         .order('created_at', { ascending: false })
         .limit(1);
 
