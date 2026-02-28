@@ -1,7 +1,9 @@
 const { genAI, tools } = require('../config/ai');
-const cacheManager = require('../utils/cache');
 const config = require('../config');
 const toolService = require('./toolService');
+const logger = require('../utils/logger').default;
+const ConfigProvider = require('../core/config/ConfigProvider').default;
+const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
 
 class AIService {
   model: any;
@@ -11,61 +13,35 @@ class AIService {
   }
 
   /**
-   * Inicializa el modelo con la instrucción de sistema dinámica
+   * Inicializa el modelo usando la memoria RAM (Cero Queries)
    */
   async initializeModel(leadData) {
-    console.log(`   [IA] Inicializando modelo Flash (Latest)...`);
-    const currentTime = new Date().toLocaleString("es-CO", { timeZone: config.TIMEZONE });
-    const currentStage = leadData?.current_step || 'SALUDO';
-    const userSummary = leadData?.summary || 'Nuevo cliente.';
+    logger.info(`[IA] Inicializando modelo Flash (Latest) sincrónicamente...`);
 
-    // Parsear stringificación del JSONB si es necesario
-    const medicalHistory = leadData?.medical_history ? JSON.stringify(leadData.medical_history, null, 2) : 'Ninguno registrado aún.';
+    // Obtener configuración inmutable desde RAM
+    const appConfig = ConfigProvider.getConfig();
+    const catalogString = ConfigProvider.getCatalogString();
 
-    const servicesCatalog = await cacheManager.getCatalog();
-    const agendaConfig = await cacheManager.getAgendaConfig();
-
-    console.log(`   [IA] Contexto: Etapa=${currentStage} | Resumen: ${userSummary.substring(0, 30)}...`);
-
-    const systemInstruction = `Eres "${agendaConfig.agentName || 'Asistente'}", la asistente virtual de "${agendaConfig.siteName || 'Pet Care Studio'}". 
-    PERSONALIDAD: ${agendaConfig.agentPersonality || 'Amigable, profesional y apasionada por las mascotas.'}
-    
-    🗓️ HORA ACTUAL: ${currentTime}
-    ESTADO CLIENTE: ${currentStage}. 
-    RESUMEN RECIENTE (Chat Corto Plazo): ${userSummary}.
-
-    🧠 FICHA CLÍNICA & PREFERENCIAS (Memoria a Largo Plazo):
-    ${medicalHistory}
-    (Usa OBLIGATORIAMENTE esta información clínica/preferencial antes de ofrecer servicios, alertando si hay incompatibilidades como alergias).
-
-    
-    SERVICIOS DISPONIBLES:
-    ${servicesCatalog}
-    
-    HORARIOS DE ATENCIÓN:
-    ${agendaConfig.business_hours_text || '- Lunes a Sábado: 09:00 AM a 05:00 PM (17:00).'}
-    ${agendaConfig.closed_days_text ? `\nDÍAS CERRADOS:\n${agendaConfig.closed_days_text}` : '\n- Domingos: Cerrado.'}
-    
-    REGLAS DE NEGOCIO EN EL ESTUDIO:
-    ${agendaConfig.businessRules || 'Tratar a cada mascota con amor.'}
-    
-    INSTRUCCIONES MAESTRAS:
-    ${agendaConfig.masterPrompt || 'Tu objetivo es ayudar al cliente a agendar citas y resolver dudas. Sé concisa y amable.'}
-
-    REGLAS DE ORO (OBLIGATORIAS):
-    1. PROHIBIDO decir "Déjame revisar", "Dame un momento", "Ya te confirmo" o similares. Tienes acceso instantáneo a la agenda.
-    2. Si necesitas verificar algo (como disponibilidad), ejecuta 'check_availability' DE INMEDIATO y responde directamente con el resultado que recibas.
-    3. Nunca des una respuesta de texto que prometa una acción futura; realiza la acción AHORA usando las herramientas.
-    4. Sé concisa y amable. Usa Emojis 🐾.
-    5. Citas -> Usa 'check_availability' para ver huecos y 'book_appointment' SOLO cuando el cliente acepte un horario específico.
-    6. Traspaso humano -> Solo si el cliente lo pide o está frustrado, usa 'transfer_to_human'.`;
+    // Construir el Prompt Maestro Modularmente
+    const systemInstruction = new SystemPromptBuilder()
+      .setIdentity(appConfig)
+      .setTimeContext(config.TIMEZONE)
+      .setLeadContext(leadData?.current_step, leadData?.summary)
+      .setMedicalHistory(leadData?.medical_history)
+      .setCatalog(catalogString)
+      .setOperations(appConfig)
+      .setMasterInstructions(appConfig)
+      .setHardcodedRules()
+      .build();
 
     this.model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest", // Alias dinámico al mejor flash disponible
+      model: "gemini-flash-latest",
       tools: [tools],
       systemInstruction
     });
-    console.log(`   [IA] Modelo listo.`);
+
+    logger.info(`[IA] Pre-Prompt Ensamblado: ${systemInstruction.length} caracteres.`);
+    logger.info(`[IA] Modelo listo.`);
   }
 
   /**
@@ -82,25 +58,37 @@ class AIService {
     if (!this.model) throw new Error("IA no inicializada.");
 
     const sanitizedHistory = this._sanitizeHistory(history);
-    console.log(`   [IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs).`);
+    logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs).`);
 
     const chatSession = this.model.startChat({
       history: sanitizedHistory
     });
 
-    console.log(`   [IA] Enviando prompt: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
-    const result = await chatSession.sendMessage(message);
+    logger.info(`[IA] Enviando prompt: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
 
-    const usage = result.response.usageMetadata;
+    let result;
+    try {
+      logger.info("[DEBUG] Ejecutando chatSession.sendMessage...");
+      result = await Promise.race([
+        chatSession.sendMessage(message),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de 20s en Gemini API")), 20000))
+      ]);
+      logger.info("[DEBUG] chatSession.sendMessage finalizado con éxito.");
+    } catch (apiError: any) {
+      logger.error(`[IA] Error en Gemini API durante sendMessage: ${apiError.message}`, { error: apiError });
+      throw apiError;
+    }
+
+    const usage = result?.response?.usageMetadata;
     if (usage) {
-      console.log(`   [IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+      logger.info(`[IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
     }
 
     const calls = result.response.functionCalls();
     if (calls && calls.length > 0) {
-      console.log(`   [IA] Gemini respondió con CALL: ${calls.map(c => c.name).join(', ')}`);
+      logger.info(`[IA] Gemini respondió con CALL: ${calls.map(c => c.name).join(', ')}`);
     } else {
-      console.log(`   [IA] Gemini respondió con TEXTO directamente.`);
+      logger.info(`[IA] Gemini respondió con TEXTO directamente.`);
     }
 
     return {
@@ -124,15 +112,15 @@ class AIService {
       for (const call of currentCalls) {
         const toolName = call.name;
         const args = call.args;
-        console.log(`   [TOOL] Executing: ${toolName} para ${phone}`);
+        logger.info(`[TOOL] Executing: ${toolName} para ${phone}`);
 
         try {
           const toolResult = await toolService[toolName](args, phone);
           toolResponses.push({
             functionResponse: { name: toolName, response: toolResult }
           });
-        } catch (error) {
-          console.error(`   [TOOL] Error fatal en ${toolName}:`, error.message);
+        } catch (error: any) {
+          logger.error(`[TOOL] Error fatal en ${toolName}`, { error });
           toolResponses.push({
             functionResponse: { name: toolName, response: { status: "error", message: "Error interno ejecutando herramienta." } }
           });
@@ -144,14 +132,14 @@ class AIService {
 
       const usage = result.response.usageMetadata;
       if (usage) {
-        console.log(`   [IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+        logger.info(`[IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
       }
 
       finalResponse.text = result.response.text();
       currentCalls = result.response.functionCalls();
 
       if (currentCalls && currentCalls.length > 0) {
-        console.log(`   [IA] Gemini pidió más llamadas: ${currentCalls.map(c => c.name).join(', ')}`);
+        logger.info(`[IA] Gemini pidió más llamadas: ${currentCalls.map(c => c.name).join(', ')}`);
       }
     }
 
@@ -165,7 +153,7 @@ class AIService {
 
     // 1. Quitar el último si es del usuario (porque se enviará en el prompt actual)
     if (sanitized.length > 0 && sanitized[sanitized.length - 1].role === 'user') {
-      console.log(`   [IA] Historial ajustado: quitando último mensaje 'user' para evitar duplicidad.`);
+      logger.info(`[IA] Historial ajustado: quitando último mensaje 'user' para evitar duplicidad.`);
       sanitized.pop();
     }
 

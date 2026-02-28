@@ -1,8 +1,10 @@
 const supabase = require('../config/database');
-const cacheManager = require('../utils/cache');
+const ConfigProvider = require('../core/config/ConfigProvider').default;
 const { isValidDate, isValidTime, isFutureDate, isFutureDateTime, isWithinBusinessHours } = require('../utils/validators');
 const notificationService = require('./notificationService');
 const config = require('../config');
+const logger = require('../utils/logger').default;
+const DateUtils = require('../utils/DateUtils').default;
 
 class AppointmentService {
   /**
@@ -17,8 +19,8 @@ class AppointmentService {
       };
     }
 
-    const agendaConfig = await cacheManager.getAgendaConfig();
-    const checkDate = new Date(`${date}T12:00:00-05:00`);
+    const agendaConfig = ConfigProvider.getConfig().hours;
+    const checkDate = DateUtils.createBogotaDate(date, "12:00");
 
     // Verificar si es un día cerrado
     const closedDays = agendaConfig.closedDays || [];
@@ -38,7 +40,7 @@ class AppointmentService {
         .neq('status', 'cancelada');
 
       if (error) {
-        console.error("Error consultando disponibilidad:", error);
+        logger.error("Error consultando disponibilidad", { error });
         return {
           status: "error",
           message: "Lo siento, hubo un problema consultando el calendario."
@@ -57,8 +59,8 @@ class AppointmentService {
           ? "Estos son los bloques de media hora libres."
           : "Ese día está completamente ocupado."
       };
-    } catch (error) {
-      console.error("Error en checkAvailability:", error);
+    } catch (error: any) {
+      logger.error("Error en checkAvailability", { error });
       return {
         status: "error",
         message: "Error interno del sistema."
@@ -71,29 +73,32 @@ class AppointmentService {
    */
   generateAvailableSlots(date, config, existingAppointments, durationMinutes) {
     const libres = [];
-    let currentSlot = new Date(`${date}T${config.open}:00-05:00`);
-    const closingTime = new Date(`${date}T${config.close}:00-05:00`);
+    let currentSlot = DateUtils.createBogotaDate(date, config.open);
+    const closingTime = DateUtils.createBogotaDate(date, config.close);
     const duration = parseInt(durationMinutes) || config.defaultDuration || 60;
 
-    // Obtener epoch crudo de la hora real
-    const now = new Date();
+    const nowBogotaStr = DateUtils.getTodayBogotaStr();
+    const now = DateUtils.getNow();
 
     while (currentSlot < closingTime) {
       const testStart = new Date(currentSlot);
-      const testEnd = new Date(testStart.getTime() + duration * 60 * 1000);
+      const testEnd = DateUtils.addMinutes(testStart, duration);
 
       // Si el servicio termina después del cierre, truncar la iteración futura
       if (testEnd > closingTime) {
         break;
       }
 
-      // Si la hora de inicio es en el pasado absoluto, omitir y avanzar al siguiente
-      if (testStart.getTime() <= now.getTime()) {
-        currentSlot = new Date(currentSlot.getTime() + 30 * 60 * 1000);
-        continue;
+      // IMPORTANTE: Solo bloquear horas del pasado si la fecha consultada es HOY.
+      // Si la cita es para mañana o después, todas las horas (desde apertura) son válidas.
+      if (date === nowBogotaStr) {
+        if (testStart.getTime() <= now.getTime()) {
+          currentSlot = DateUtils.addMinutes(currentSlot, 30);
+          continue;
+        }
       }
 
-      const timeString = `${currentSlot.getHours().toString().padStart(2, '0')}:${currentSlot.getMinutes().toString().padStart(2, '0')}`;
+      const timeString = DateUtils.getBogotaTimeString(currentSlot);
 
       // Verificar solapamientos para todo el intervalo de [testStart a testEnd]
       let overlappingCount = 0;
@@ -102,9 +107,9 @@ class AppointmentService {
         const sTime = appointment.start_time.substring(0, 5);
         const eTime = appointment.end_time.substring(0, 5);
 
-        const aStart = new Date(`${date}T${sTime}:00-05:00`);
-        const aEnd = new Date(`${date}T${eTime}:00-05:00`);
-        const aEndWithBuffer = new Date(aEnd.getTime() + (config.buffer || 0) * 60 * 1000);
+        const aStart = DateUtils.createBogotaDate(date, sTime);
+        const aEnd = DateUtils.createBogotaDate(date, eTime);
+        const aEndWithBuffer = DateUtils.addMinutes(aEnd, config.buffer || 0);
 
         // Si hay cualquier intersección en el rango de tiempo
         if (testStart < aEndWithBuffer && testEnd > aStart) {
@@ -118,7 +123,7 @@ class AppointmentService {
       }
 
       // Avanzar en intervalos de 30 minutos (los turnos empiezan en punto o y media)
-      currentSlot = new Date(currentSlot.getTime() + 30 * 60 * 1000);
+      currentSlot = DateUtils.addMinutes(currentSlot, 30);
     }
 
     return libres;
@@ -151,7 +156,7 @@ class AppointmentService {
     }
 
     // --- Validación Real de Catálogo (Anti-Alucinaciones) ---
-    const catalogArray = await cacheManager.getCatalogArray();
+    const catalogArray = ConfigProvider.getCatalogArray();
     let finalDuration = parseInt(duration_minutes) || 60;
     let finalService = service || 'Servicio General';
 
@@ -177,24 +182,15 @@ class AppointmentService {
       finalService = serviceFound.title;
     }
 
-    const agendaConfig = await cacheManager.getAgendaConfig();
+    const agendaConfig = ConfigProvider.getConfig().hours;
 
-    // Función auxiliar para crear fecha en Bogotá (GMT-5) sin depender del sistema
-    const createBogotaDate = (d, t) => {
-      // t puede ser HH:mm o HH:mm:ss
-      const time = (t || "00:00").substring(0, 5);
-      return new Date(`${d}T${time}:00-05:00`);
-    };
+    const exactStart = DateUtils.createBogotaDate(date, start_time);
+    const exactEnd = DateUtils.addMinutes(exactStart, finalDuration);
+    const closingTime = DateUtils.createBogotaDate(date, agendaConfig.close || "17:00");
 
-    const exactStart = createBogotaDate(date, start_time);
-    const exactEnd = new Date(exactStart.getTime() + (finalDuration * 60 * 1000));
-    const closingTime = createBogotaDate(date, agendaConfig.close || "17:00");
+    const end_time = DateUtils.getBogotaTimeString(exactEnd);
 
-    // Para visualizar end_time correctamente en GMT-5 (BOG)
-    const bogotaClock = new Date(exactEnd.getTime() - (5 * 60 * 60 * 1000));
-    const end_time = `${bogotaClock.getUTCHours().toString().padStart(2, '0')}:${bogotaClock.getUTCMinutes().toString().padStart(2, '0')}`;
-
-    console.log(`   [DEBUG] Validando: Termina ${end_time} vs Cierre ${agendaConfig.close}`);
+    logger.debug(`Validando: Termina ${end_time} vs Cierre ${agendaConfig.close}`);
 
     if (exactEnd.getTime() > closingTime.getTime()) {
       return {
@@ -232,7 +228,7 @@ class AppointmentService {
       });
 
       if (error) {
-        console.error("Error fatal ejecutando RPC guardando cita:", error);
+        logger.error("Error fatal ejecutando RPC guardando cita", { error });
         return {
           status: "error",
           message: "Error interno de base de datos impidió agendar la cita."
@@ -256,22 +252,21 @@ class AppointmentService {
       });
 
       // Registrar métrica de negocio
-      console.info(JSON.stringify({
+      logger.info("Cita creada", {
         metric: "cita_creada",
         phone: phone,
         service: finalService,
         date: date,
-        time: start_time,
-        timestamp: new Date().toISOString()
-      }));
+        time: start_time
+      });
 
       return {
         status: "success",
         message: "Cita guardada exitosamente."
       };
 
-    } catch (error) {
-      console.error("Error en bookAppointment:", error);
+    } catch (error: any) {
+      logger.error("Error en bookAppointment", { error });
       return {
         status: "error",
         message: "Error interno del sistema."
@@ -330,20 +325,19 @@ class AppointmentService {
       });
 
       // Registrar métrica de negocio
-      console.info(JSON.stringify({
+      logger.info("Cita cancelada", {
         metric: "cita_cancelada",
         phone: phone,
-        date: date,
-        timestamp: new Date().toISOString()
-      }));
+        date: date
+      });
 
       return {
         status: "success",
         message: "¡La cita fue cancelada exitosamente!"
       };
 
-    } catch (error) {
-      console.error("Error en cancelAppointment:", error);
+    } catch (error: any) {
+      logger.error("Error en cancelAppointment", { error });
       return {
         status: "error",
         message: "Error interno del sistema."

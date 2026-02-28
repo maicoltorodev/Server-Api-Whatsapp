@@ -1,0 +1,54 @@
+const logger = require('./logger').default;
+
+type Task = () => Promise<void>;
+
+class ConcurrencyQueue {
+    private concurrency: number;
+    private running: number;
+    private queue: Task[];
+
+    constructor(concurrency: number = 5) {
+        // Límite de conexiones simultáneas (ej. cuántos procesos de IA pueden correr al mismo tiempo)
+        this.concurrency = concurrency;
+        this.running = 0;
+        this.queue = [];
+    }
+
+    /**
+     * Encola una tarea asíncrona para ser ejecutada cuando haya capacidad.
+     */
+    public enqueue(task: Task): void {
+        this.queue.push(task);
+        logger.debug(`[QUEUE] +1 Tarea encolada. Total en espera: ${this.queue.length}`);
+        this.processNext();
+    }
+
+    /**
+     * Motor interno de la cola.
+     */
+    private async processNext(): Promise<void> {
+        // Bloqueo estricto: Si ya estamos al máximo, no hacer nada hasta que se libere un hilo.
+        if (this.running >= this.concurrency || this.queue.length === 0) {
+            return;
+        }
+
+        const task = this.queue.shift();
+        if (!task) return;
+
+        this.running++;
+        logger.info(`[QUEUE] 🚦 Ejecutando tarea (Acelerador: ${this.running}/${this.concurrency} | Fila de espera: ${this.queue.length})`);
+
+        try {
+            await task();
+        } catch (error) {
+            logger.error(`[QUEUE] 💥 Error en la ejecución de la tarea encolada`, { error });
+        } finally {
+            this.running--;
+            logger.debug(`[QUEUE] ✅ Tarea terminada. (Acelerador: ${this.running}/${this.concurrency})`);
+            // Inmediatamente jalar la siguiente tarea en la fila
+            this.processNext();
+        }
+    }
+}
+
+export default new ConcurrencyQueue(3); // Solo permitimos 3 chats con IA procesándose al mismo tiempo

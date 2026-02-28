@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const appointmentService = require('../services/appointmentService');
 const notificationService = require('../services/notificationService');
 const config = require('../config');
+const logger = require('../utils/logger').default;
 
 class ReminderJob {
   isScheduled: boolean;
@@ -15,13 +16,13 @@ class ReminderJob {
    */
   start() {
     if (this.isScheduled) {
-      console.log("⚠️ El job de recordatorios ya está programado.");
+      logger.warn("El job de recordatorios ya está programado.");
       return;
     }
 
     // Se ejecuta a las 7:30 AM todos los días hora Bogotá
     cron.schedule('30 7 * * *', async () => {
-      console.log("⏰ Ejecutando cronjob: Envío masivo de recordatorios diarios...");
+      logger.info("Ejecutando cronjob: Envío masivo de recordatorios diarios...");
       await this.sendDailyReminders();
     }, {
       scheduled: true,
@@ -29,7 +30,7 @@ class ReminderJob {
     });
 
     this.isScheduled = true;
-    console.log("✅ Job de recordatorios programado para las 7:30 AM (hora Bogotá).");
+    logger.info("Job de recordatorios programado para las 7:30 AM (hora Bogotá).");
   }
 
   /**
@@ -55,12 +56,12 @@ class ReminderJob {
           // Pausar 1 segundo entre envíos para evitar rate limits
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        console.log(`✅ ¡Se enviaron ${appointments.length} recordatorios automáticos!`);
+        logger.info(`¡Se enviaron ${appointments.length} recordatorios automáticos!`);
       } else {
-        console.log("No hay citas aprobadas para recordar hoy.");
+        logger.info("No hay citas aprobadas para recordar hoy.");
       }
-    } catch (error) {
-      console.error("Error al enviar recordatorios cron:", error);
+    } catch (error: any) {
+      logger.error("Error al enviar recordatorios cron", { error });
     }
   }
 
@@ -71,7 +72,7 @@ class ReminderJob {
     if (this.isScheduled) {
       cron.getTasks().forEach(task => task.stop());
       this.isScheduled = false;
-      console.log("⏹️ Job de recordatorios detenido.");
+      logger.info("Job de recordatorios detenido.");
     }
   }
 }

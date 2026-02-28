@@ -10,64 +10,56 @@ jest.mock('../../src/config/database', () => ({
     update: jest.fn().mockReturnThis()
 }));
 
-describe('Memoria Permanente (LeadModel - Medical History)', () => {
+describe('Memoria Permanente (LeadModel - Medical History Multi-Pet)', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    it('Debe inicializar un arreglo y agregar un valor si la categoria no existe', async () => {
-        // Mock de que el usuario existe pero no tiene medical_history previomente guardado
+    it('Debe inicializar un arreglo de mascotas y agregar un valor', async () => {
         supabase.single.mockResolvedValueOnce({ data: { phone: '123', medical_history: null } });
+        supabase.single.mockResolvedValueOnce({ data: true });
 
-        // Mock the update operation successful return
-        supabase.single.mockResolvedValueOnce({ data: { phone: '123', medical_history: { allergies: ['Pollo'] } } });
-
-        await leadModel.updateMedicalHistory('123', 'allergies', 'Pollo');
+        await leadModel.updateMedicalHistory('123', 'allergies', 'Pollo', 'Baly');
 
         expect(supabase.update).toHaveBeenCalledWith({
-            medical_history: { allergies: ['Pollo'] }
+            medical_history: {
+                pets: [{ name: 'Baly', allergies: ['Pollo'], behavior: '', preferences: [], notes: '' }]
+            }
         });
     });
 
-    it('Debe agregar a un arreglo existente sin duplicar', async () => {
-        // Mock usuario ya tiene alergia al Pollo
+    it('Debe agregar a una mascota existente sin duplicar alergias', async () => {
         supabase.single.mockResolvedValueOnce({
-            data: { phone: '123', medical_history: { allergies: ['Pollo'] } }
+            data: {
+                phone: '123',
+                medical_history: { pets: [{ name: 'Baly', allergies: ['Pollo'], behavior: '', preferences: [], notes: '' }] }
+            }
         });
         supabase.single.mockResolvedValueOnce({ data: true });
 
-        // Intentar agregar Pollo de nuevo
-        await leadModel.updateMedicalHistory('123', 'allergies', 'Pollo');
-
-        // No debe duplicarse en el objeto que recibe .update()
-        expect(supabase.update).toHaveBeenCalledWith({
-            medical_history: { allergies: ['Pollo'] }
-        });
-
-        // Ahora intentar agregar Pescado
-        supabase.single.mockResolvedValueOnce({
-            data: { phone: '123', medical_history: { allergies: ['Pollo'] } }
-        });
-        supabase.single.mockResolvedValueOnce({ data: true });
-
-        await leadModel.updateMedicalHistory('123', 'allergies', 'Pescado');
+        await leadModel.updateMedicalHistory('123', 'allergies', 'Pollo', 'Baly');
 
         expect(supabase.update).toHaveBeenCalledWith({
-            medical_history: { allergies: ['Pollo', 'Pescado'] }
+            medical_history: {
+                pets: [{ name: 'Baly', allergies: ['Pollo'], behavior: '', preferences: [], notes: '' }]
+            }
         });
     });
 
-    it('Debe sobreescribir propiedades en categorias no agrupables (ej: behavior)', async () => {
+    it('Debe manejar múltiples mascotas independientes', async () => {
         supabase.single.mockResolvedValueOnce({
-            data: { phone: '123', medical_history: { behavior: 'Tranquilo' } }
+            data: {
+                phone: '123',
+                medical_history: { pets: [{ name: 'Baly', allergies: ['Pollo'], behavior: '', preferences: [], notes: '' }] }
+            }
         });
         supabase.single.mockResolvedValueOnce({ data: true });
 
-        await leadModel.updateMedicalHistory('123', 'behavior', 'Nervioso');
+        await leadModel.updateMedicalHistory('123', 'behavior', 'Tranquila', 'Luna');
 
-        expect(supabase.update).toHaveBeenCalledWith({
-            medical_history: { behavior: 'Nervioso' }
-        });
+        const updateCall = supabase.update.mock.calls[0][0];
+        expect(updateCall.medical_history.pets).toHaveLength(2);
+        expect(updateCall.medical_history.pets.find(p => p.name === 'Luna').behavior).toBe('Tranquila');
     });
 });

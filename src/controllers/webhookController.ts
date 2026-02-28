@@ -5,6 +5,7 @@ const notificationService = require('../services/notificationService');
 const rateLimiter = require('../middleware/rateLimit');
 const config = require('../config');
 const messageQueue = require('../utils/messageQueue');
+const logger = require('../utils/logger').default;
 
 class WebhookController {
   /**
@@ -15,28 +16,28 @@ class WebhookController {
     res.sendStatus(200);
 
     try {
-      console.log("\n--- 📥 NUEVO WEBHOOK DE WHATSAPP ---");
+      logger.info("--- 📥 NUEVO WEBHOOK DE WHATSAPP ---");
       // 1. Extraer mensaje
       const message = whatsappService.extractMessageFromWebhook(body);
       if (!message) {
-        console.log("ℹ️ Webhook sin mensaje procesable (bloque de estado o lectura).");
+        logger.info("Webhook sin mensaje procesable (bloque de estado o lectura).");
         return;
       }
 
       const { id: msgId, from, text, isText } = message;
-      console.log(`📍 Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
+      logger.info(`Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
 
       // 2. Seguridad y Duplicados
       if (rateLimiter.isMessageProcessed(msgId)) {
-        console.log(`⛔ Mensaje duplicado detectado (ID: ${msgId}). Ignorando.`);
+        logger.warn(`Mensaje duplicado detectado (ID: ${msgId}). Ignorando.`);
         return;
       }
       await whatsappService.markAsRead(msgId);
-      console.log(`✅ Mensaje marcado como leído.`);
+      logger.info(`Mensaje marcado como leído.`);
 
       // 3. Validación de contenido
       if (!isText) {
-        console.log("⚠️ Contenido no es texto. Enviando mensaje de aviso.");
+        logger.warn("Contenido no es texto. Enviando mensaje de aviso.");
         await whatsappService.sendMessage(
           from,
           "¡Hola! 🐾 Por ahora solo puedo procesar mensajes de texto. Si necesitas enviar fotos o audios, pide hablar con un humano."
@@ -44,11 +45,11 @@ class WebhookController {
         return;
       }
 
-      console.log(`📝 Texto recibido: "${text}"`);
+      logger.info(`Texto recibido: "${text}"`);
 
       // 4. Rate Limiting (Spam)
       if (rateLimiter.isUserSpamming(from)) {
-        console.log(`🚨 SPAM DETECTADO: ${from}.`);
+        logger.warn(`SPAM DETECTADO: ${from}.`);
         if (rateLimiter.userMessageCount.get(from).length === config.RATE_LIMIT.MAX_MESSAGES + 1) {
           await leadModel.deactivateBot(from);
           await notificationService.notifyOwner(
@@ -56,17 +57,17 @@ class WebhookController {
             "Alerta Sistema",
             "🚨 IA desactivada automáticamente por spam detectado."
           );
-          console.log("🤖 IA Desactivada preventivamente por spam.");
+          logger.warn("IA Desactivada preventivamente por spam.");
         }
         return;
       }
 
       // 5. Delegar a la Cola de Espera (Debounce de 3s)
-      console.log(`➡️ Poniendo el mensaje en espera (Embudo Antispam de 3s)...`);
+      logger.info(`Poniendo el mensaje en espera (Embudo Antispam de 3s)...`);
       messageQueue.enqueueMessage(from, text);
 
     } catch (error) {
-      console.error("🔥 Error crítico en WebhookController:", error.message);
+      logger.error("Error crítico en WebhookController", { error });
       await this.handleCriticalError(req.body, error);
     }
   }
@@ -81,7 +82,7 @@ class WebhookController {
         await notificationService.notifyCriticalError(fromNumber, error.message);
       }
     } catch (innerError) {
-      console.error("No se pudo notificar la falla:", innerError.message);
+      logger.error("No se pudo notificar la falla", { error: innerError });
     }
   }
 

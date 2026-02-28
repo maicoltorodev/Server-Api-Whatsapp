@@ -1,6 +1,7 @@
 const axios = require('axios');
 const config = require('../config');
 const { isValidWhatsAppMessage } = require('../utils/validators');
+const logger = require('../utils/logger').default;
 
 class WhatsAppService {
   baseUrl: string;
@@ -26,9 +27,9 @@ class WhatsAppService {
         text: { body: text }
       }, { headers: this.headers });
 
-      console.log(`✅ Mensaje enviado a ${to}: ${text.substring(0, 50)}...`);
-    } catch (error) {
-      console.error("Error enviando mensaje WhatsApp:", error.response?.data || error.message);
+      logger.info(`Mensaje enviado a ${to}: ${text.substring(0, 50)}...`);
+    } catch (error: any) {
+      logger.error("Error enviando mensaje WhatsApp", { error: error.response?.data || error.message });
       throw error;
     }
   }
@@ -42,11 +43,9 @@ class WhatsAppService {
         messaging_product: "whatsapp",
         status: "read",
         message_id: messageId
-      }, {
-        headers: { 'Authorization': `Bearer ${config.WHATSAPP_TOKEN}` }
-      });
-    } catch (error) {
-      console.error("Error marcando mensaje como leído:", error.response?.data || error.message);
+      }, { headers: this.headers });
+    } catch (error: any) {
+      logger.error("Error marcando mensaje como leído", { error: error.response?.data || error.message });
       // No lanzamos el error para no interrumpir el flujo principal
     }
   }
@@ -88,10 +87,7 @@ class WhatsAppService {
    * Envía SMS al cliente (stub para Twilio/etc)
    */
   async sendSMS(to, text) {
-    console.log(`\n---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------`);
-    console.log(`PARA: ${to}`);
-    console.log(`MENSAJE: ${text}`);
-    console.log(`--------------------------------------------------\n`);
+    logger.info(`---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------\nPARA: ${to}\nMENSAJE: ${text}`);
     return true;
   }
 }

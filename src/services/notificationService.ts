@@ -1,13 +1,11 @@
 const config = require('../config');
 const systemEvents = require('../utils/eventEmitter');
+const logger = require('../utils/logger').default;
 
 class NotificationService {
   async notifyOwner(clientPhone, clientName, message) {
-    const logContent = `⚠️ AVISO AL SISTEMA: El cliente ${clientName} (${clientPhone}) necesita atención/tiene actividad.\nMensaje: "${message}"`;
-
-    console.log(`\n---------- 🛎️ ALERTA PARA DASHBOARD ----------`);
-    console.log(logContent);
-    console.log(`----------------------------------------------\n`);
+    const logContent = `AVISO AL SISTEMA: El cliente ${clientName} (${clientPhone}) necesita atención/tiene actividad.\nMensaje: "${message}"`;
+    logger.warn(`---------- 🛎️ ALERTA PARA DASHBOARD ----------\n${logContent}`);
 
     // TODO: Emitir evento WebSocket o guardar en tabla central de notificaciones
   }
@@ -16,11 +14,8 @@ class NotificationService {
    * Notifica requerimiento urgente de humano
    */
   async notifyHumanRequired(clientPhone, clientName, message) {
-    const logContent = `🚨 URGENTE: El cliente ${clientName} (${clientPhone}) requiere intervención manual.\nMensaje: "${message}"\nEstado Bot: PAUSADO.`;
-
-    console.log(`\n---------- 🛎️ REQUEST HUMANO (DASHBOARD) ----------`);
-    console.log(logContent);
-    console.log(`---------------------------------------------------\n`);
+    const logContent = `URGENTE: El cliente ${clientName} (${clientPhone}) requiere intervención manual.\nMensaje: "${message}"\nEstado Bot: PAUSADO.`;
+    logger.warn(`---------- 🛎️ REQUEST HUMANO (DASHBOARD) ----------\n${logContent}`);
 
     // Emitir evento al Dashboard Administrativo mediante SSE
     systemEvents.emit('human_required', JSON.stringify({
@@ -35,10 +30,7 @@ class NotificationService {
    * Envía SMS automatizado al cliente
    */
   async sendSMS(to, text) {
-    console.log(`\n---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------`);
-    console.log(`PARA: ${to}`);
-    console.log(`MENSAJE: ${text}`);
-    console.log(`--------------------------------------------------\n`);
+    logger.info(`---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------\nPARA: ${to}\nMENSAJE: ${text}`);
 
     // Aquí se integraría con Twilio o servicio de SMS real
     return true;
@@ -66,7 +58,7 @@ class NotificationService {
    * Notifica error crítico al dueño
    */
   async notifyCriticalError(clientPhone, errorMessage) {
-    console.log(`\n🚨 ERROR CRÍTICO EN EL BOT (Cliente: ${clientPhone}): ${errorMessage}`);
+    logger.error(`ERROR CRÍTICO EN EL BOT (Cliente: ${clientPhone}): ${errorMessage}`);
     // Opcional: Enviar SMS al Admin
   }
 
@@ -80,8 +72,8 @@ class NotificationService {
         clientPhone,
         "Disculpa, estoy experimentando un pequeño problema técnico 😵‍💫. Un humano tomará mi lugar en breve para ayudarte."
       );
-    } catch (error) {
-      console.error("Error notificando error al cliente:", error);
+    } catch (error: any) {
+      logger.error("Error notificando error al cliente", { error });
     }
   }
 }

@@ -73,14 +73,15 @@ const tools = {
     },
     {
       name: "save_pet_preference",
-      description: "HERRAMIENTA DE MEMORIA PERMANENTE. Úsala INMEDIATAMENTE cuando el cliente mencione un dato vital o preferencia a largo plazo (alergias, comportamientos de la mascota, disgustos, raza). Esto se guardará en su ficha clínica y lo recordarás para siempre.",
+      description: "HERRAMIENTA DE MEMORIA PERMANENTE. Úsala INMEDIATAMENTE cuando el cliente mencione un dato vital o preferencia a largo plazo (alergias, comportamientos de la mascota, disgustos, raza). Un cliente puede tener varias mascotas, asegúrate de preguntar o identificar de cuál habla.",
       parameters: {
         type: "OBJECT",
         properties: {
+          pet_name: { type: "STRING", description: "Nombre de la mascota (ej. 'Baly', 'Luna'). Úsalo siempre para distinguir entre diferentes mascotas del mismo dueño." },
           category: { type: "STRING", enum: ["allergies", "behavior", "preferences", "notes"], description: "Categoría del historial." },
           value: { type: "STRING", description: "El dato a guardar (ej. 'Alergia al pollo', 'Nervioso con secadora', 'Poodle')." }
         },
-        required: ["category", "value"]
+        required: ["pet_name", "category", "value"]
       }
     }
   ]

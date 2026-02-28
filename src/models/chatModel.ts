@@ -1,4 +1,5 @@
 const supabase = require('../config/database');
+const logger = require('../utils/logger').default;
 
 class ChatModel {
   /**
@@ -12,7 +13,7 @@ class ChatModel {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-      console.error(`🔥 BD Error (chatModel.getHistory) [${phone}]:`, error.message);
+      logger.error(`BD Error (chatModel.getHistory) [${phone}]`, { error });
       throw error;
     }
 
@@ -34,7 +35,7 @@ class ChatModel {
       .single();
 
     if (error) {
-      console.error(`🔥 BD Error (chatModel.saveHistory) [${phone}]:`, error.message);
+      logger.error(`BD Error (chatModel.saveHistory) [${phone}]`, { error });
       throw error;
     }
 
@@ -64,7 +65,7 @@ class ChatModel {
       .eq('phone', phone);
 
     if (error) {
-      console.error(`🔥 BD Error (chatModel.clearHistory) [${phone}]:`, error.message);
+      logger.error(`BD Error (chatModel.clearHistory) [${phone}]`, { error });
       throw error;
     }
 
@@ -81,7 +82,7 @@ class ChatModel {
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error(`🔥 BD Error (chatModel.getAllChats):`, error.message);
+      logger.error(`BD Error (chatModel.getAllChats)`, { error });
       throw error;
     }
 

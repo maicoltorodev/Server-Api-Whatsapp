@@ -1,4 +1,5 @@
 const supabase = require('../config/database');
+const logger = require('../utils/logger').default;
 
 class LeadModel {
   /**
@@ -12,7 +13,7 @@ class LeadModel {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-      console.error(`🔥 BD Error (leadModel.getByPhone) [${phone}]:`, error.message);
+      logger.error(`BD Error (leadModel.getByPhone) [${phone}]`, { error });
       throw error;
     }
 
@@ -30,7 +31,7 @@ class LeadModel {
       .single();
 
     if (error) {
-      console.error(`🔥 BD Error (leadModel.upsert) [${leadData?.phone}]:`, error.message);
+      logger.error(`BD Error (leadModel.upsert) [${leadData?.phone}]`, { error });
       throw error;
     }
 
@@ -49,7 +50,7 @@ class LeadModel {
       .single();
 
     if (error) {
-      console.error(`🔥 BD Error (leadModel.updateStatus) [${phone}]:`, error.message);
+      logger.error(`BD Error (leadModel.updateStatus) [${phone}]`, { error });
       throw error;
     }
 
@@ -92,23 +93,33 @@ class LeadModel {
 
   /**
    * Actualiza un fragmento específico del Historial Médico (Largo plazo)
+   * Soporta múltiples mascotas por lead usando un arreglo de mascotas.
    */
-  async updateMedicalHistory(phone, category, value) {
+  async updateMedicalHistory(phone, category, value, petName) {
     const lead = await this.getByPhone(phone);
+    let history = lead?.medical_history || { pets: [] };
 
-    // Extraer historial actual o inicializar objeto vacío
-    let history = lead?.medical_history || {};
+    // Asegurar estructura de array de mascotas
+    if (!history.pets) history.pets = [];
+
+    // Buscar la mascota por nombre (mactheo case insensitive)
+    let pet = history.pets.find(p => p.name?.toLowerCase() === petName?.toLowerCase());
+
+    if (!pet) {
+      pet = { name: petName, allergies: [], behavior: '', preferences: [], notes: '' };
+      history.pets.push(pet);
+    }
 
     // Si la categoría contiene un arreglo (ej: allergies)
     if (['allergies', 'preferences'].includes(category)) {
-      if (!history[category]) history[category] = [];
+      if (!pet[category]) pet[category] = [];
       // Agregar sin duplicar
-      if (!history[category].includes(value)) {
-        history[category].push(value);
+      if (!pet[category].includes(value)) {
+        pet[category].push(value);
       }
     } else {
-      // Modificar directamente (comportamiento, notas, etc)
-      history[category] = value;
+      // Modificar directamente (behavior, notes)
+      pet[category] = value;
     }
 
     return await this.updateStatus(phone, { medical_history: history });

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const config = require('../config');
+const logger = require('../utils/logger').default;
 
 /**
  * Middleware para verificar la firma de Meta para seguridad del webhook
@@ -7,7 +8,7 @@ const config = require('../config');
 function verifyMetaSignature(req, res, next) {
   const signature = req.headers['x-hub-signature-256'];
   if (!signature) {
-    console.warn("🚫 Intento de acceso sin firma al Webhook.");
+    logger.warn("Intento de acceso sin firma al Webhook.");
     return res.sendStatus(403);
   }
 
@@ -21,7 +22,7 @@ function verifyMetaSignature(req, res, next) {
     .digest('hex');
 
   if (signatureHash !== expectedHash) {
-    console.error("☠️ FIRMA INVÁLIDA DETECTADA: Spoofing detenido.");
+    logger.error("FIRMA INVÁLIDA DETECTADA: Spoofing detenido.");
     return res.sendStatus(403);
   }
   next();
