@@ -5,11 +5,13 @@ const verifyMetaSignature = require('../middleware/verifyMetaSignature');
 const router = express.Router();
 
 // Middleware para capturar el body raw (necesario para la verificación de firma)
-router.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString();
-  }
-}));
+router.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString();
+    },
+  })
+);
 
 // Ruta de verificación del webhook (GET)
 router.get('/', (req, res) => webhookController.verifyWebhook(req, res));

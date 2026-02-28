@@ -27,11 +27,11 @@ const config = {
   // Rate Limiting Configuration
   RATE_LIMIT: {
     WINDOW_MS: 30000, // 30 seconds
-    MAX_MESSAGES: 10
+    MAX_MESSAGES: 10,
   },
 
   // Timezone
-  TIMEZONE: "America/Bogota"
+  TIMEZONE: 'America/Bogota',
 };
 
 module.exports = config;

@@ -16,10 +16,10 @@ class HealthController {
       services: {
         database: 'unknown',
         ai: 'unknown',
-        whatsapp: 'unknown'
+        whatsapp: 'unknown',
       },
       uptime: process.uptime(),
-      memory: process.memoryUsage()
+      memory: process.memoryUsage(),
     };
 
     try {
@@ -52,9 +52,12 @@ class HealthController {
       healthStatus.services.whatsapp = 'error';
     }
 
-    const statusCode = healthStatus.services.database === 'healthy' && 
-                      healthStatus.services.ai === 'healthy' && 
-                      healthStatus.services.whatsapp === 'healthy' ? 200 : 503;
+    const statusCode =
+      healthStatus.services.database === 'healthy' &&
+      healthStatus.services.ai === 'healthy' &&
+      healthStatus.services.whatsapp === 'healthy'
+        ? 200
+        : 503;
 
     res.status(statusCode).json(healthStatus);
   }

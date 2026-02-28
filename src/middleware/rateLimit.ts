@@ -14,7 +14,7 @@ class RateLimiter {
 
       // 1. Limpieza Lazy de los contadores abusivos
       for (const [phone, stamps] of this.userMessageCount.entries()) {
-        const validStamps = stamps.filter(t => now - t < config.RATE_LIMIT.WINDOW_MS);
+        const validStamps = stamps.filter((t) => now - t < config.RATE_LIMIT.WINDOW_MS);
         if (validStamps.length === 0) {
           this.userMessageCount.delete(phone);
         } else {
@@ -48,8 +48,8 @@ class RateLimiter {
     let userTimestamps = this.userMessageCount.get(userPhone) || [];
 
     // Filtramos solo los mensajes recibidos en la ventana de tiempo
-    userTimestamps = userTimestamps.filter(timestamp =>
-      now - timestamp < config.RATE_LIMIT.WINDOW_MS
+    userTimestamps = userTimestamps.filter(
+      (timestamp) => now - timestamp < config.RATE_LIMIT.WINDOW_MS
     );
     userTimestamps.push(now);
     this.userMessageCount.set(userPhone, userTimestamps);

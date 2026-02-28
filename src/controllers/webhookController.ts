@@ -16,11 +16,11 @@ class WebhookController {
     res.sendStatus(200);
 
     try {
-      logger.info("--- 📥 NUEVO WEBHOOK DE WHATSAPP ---");
+      logger.info('--- 📥 NUEVO WEBHOOK DE WHATSAPP ---');
       // 1. Extraer mensaje
       const message = whatsappService.extractMessageFromWebhook(body);
       if (!message) {
-        logger.info("Webhook sin mensaje procesable (bloque de estado o lectura).");
+        logger.info('Webhook sin mensaje procesable (bloque de estado o lectura).');
         return;
       }
 
@@ -37,10 +37,10 @@ class WebhookController {
 
       // 3. Validación de contenido
       if (!isText) {
-        logger.warn("Contenido no es texto. Enviando mensaje de aviso.");
+        logger.warn('Contenido no es texto. Enviando mensaje de aviso.');
         await whatsappService.sendMessage(
           from,
-          "¡Hola! 🐾 Por ahora solo puedo procesar mensajes de texto. Si necesitas enviar fotos o audios, pide hablar con un humano."
+          '¡Hola! 🐾 Por ahora solo puedo procesar mensajes de texto. Si necesitas enviar fotos o audios, pide hablar con un humano.'
         );
         return;
       }
@@ -54,10 +54,10 @@ class WebhookController {
           await leadModel.deactivateBot(from);
           await notificationService.notifyOwner(
             from,
-            "Alerta Sistema",
-            "🚨 IA desactivada automáticamente por spam detectado."
+            'Alerta Sistema',
+            '🚨 IA desactivada automáticamente por spam detectado.'
           );
-          logger.warn("IA Desactivada preventivamente por spam.");
+          logger.warn('IA Desactivada preventivamente por spam.');
         }
         return;
       }
@@ -65,9 +65,8 @@ class WebhookController {
       // 5. Delegar a la Cola de Espera (Debounce de 3s)
       logger.info(`Poniendo el mensaje en espera (Embudo Antispam de 3s)...`);
       messageQueue.enqueueMessage(from, text);
-
     } catch (error) {
-      logger.error("Error crítico en WebhookController", { error });
+      logger.error('Error crítico en WebhookController', { error });
       await this.handleCriticalError(req.body, error);
     }
   }
@@ -82,7 +81,7 @@ class WebhookController {
         await notificationService.notifyCriticalError(fromNumber, error.message);
       }
     } catch (innerError) {
-      logger.error("No se pudo notificar la falla", { error: innerError });
+      logger.error('No se pudo notificar la falla', { error: innerError });
     }
   }
 

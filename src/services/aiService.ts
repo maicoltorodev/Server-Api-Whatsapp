@@ -7,7 +7,7 @@ const ConfigProvider = require('../core/config/ConfigProvider').default;
 const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
 
 class AIService {
-  constructor() { }
+  constructor() {}
 
   /**
    * Inicializa el modelo usando la memoria RAM (Cero Queries)
@@ -51,13 +51,15 @@ class AIService {
     ];
 
     const modelObj = genAI.getGenerativeModel({
-      model: "gemini-flash-latest",
+      model: 'gemini-flash-latest',
       tools: [tools],
       systemInstruction,
-      safetySettings
+      safetySettings,
     });
 
-    logger.info(`[IA] Pre-Prompt Ensamblado (${systemInstruction.length} caracteres):\n====================\n${systemInstruction}\n====================`);
+    logger.info(
+      `[IA] Pre-Prompt Ensamblado (${systemInstruction.length} caracteres):\n====================\n${systemInstruction}\n====================`
+    );
     return modelObj;
   }
 
@@ -71,24 +73,28 @@ class AIService {
   _filterSafetyFalsePositives(text) {
     if (!text) return text;
     // Evita falsos positivos de la API de Gemini (Ej: bloqueos inquebrantables por palabras específicas como "loli")
-    return text.toString().replace(/\b[lL]oli\b/g, "Loly");
+    return text.toString().replace(/\b[lL]oli\b/g, 'Loly');
   }
 
   /**
    * Genera una respuesta manejando el historial de forma segura
    */
   async generateResponse(model, message, history = []) {
-    if (!model) throw new Error("IA no inicializada.");
+    if (!model) throw new Error('IA no inicializada.');
 
     const safeMessage = this._filterSafetyFalsePositives(message);
     const sanitizedHistory = this._sanitizeHistory(history);
-    logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs):\n====================\n${JSON.stringify(sanitizedHistory, null, 2)}\n====================`);
+    logger.info(
+      `[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs):\n====================\n${JSON.stringify(sanitizedHistory, null, 2)}\n====================`
+    );
 
     const chatSession = model.startChat({
-      history: sanitizedHistory
+      history: sanitizedHistory,
     });
 
-    logger.info(`[IA] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`);
+    logger.info(
+      `[IA] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`
+    );
 
     const result = await this._withRetry(async () => {
       return await chatSession.sendMessage(safeMessage);
@@ -96,12 +102,14 @@ class AIService {
 
     const usage = result?.response?.usageMetadata;
     if (usage) {
-      logger.info(`[IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+      logger.info(
+        `[IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`
+      );
     }
 
     const calls = result.response.functionCalls();
     if (calls && calls.length > 0) {
-      logger.info(`[IA] Gemini respondió con CALL: ${calls.map(c => c.name).join(', ')}`);
+      logger.info(`[IA] Gemini respondió con CALL: ${calls.map((c) => c.name).join(', ')}`);
     } else {
       logger.info(`[IA] Gemini respondió con TEXTO directamente.`);
     }
@@ -109,7 +117,7 @@ class AIService {
     return {
       functionCalls: calls,
       text: result.response.text(),
-      chatSession
+      chatSession,
     };
   }
 
@@ -118,7 +126,7 @@ class AIService {
    */
   async processFunctionCalls(calls, chatSession, phone) {
     let currentCalls = calls;
-    let finalResponse = { text: "", chatSession };
+    let finalResponse = { text: '', chatSession };
 
     // Bucle para manejar function calls anidados o múltiples
     while (currentCalls && currentCalls.length > 0) {
@@ -132,12 +140,15 @@ class AIService {
         try {
           const toolResult = await toolService[toolName](args, phone);
           toolResponses.push({
-            functionResponse: { name: toolName, response: toolResult }
+            functionResponse: { name: toolName, response: toolResult },
           });
         } catch (error: any) {
           logger.error(`[TOOL] Error fatal en ${toolName}`, { error });
           toolResponses.push({
-            functionResponse: { name: toolName, response: { status: "error", message: "Error interno ejecutando herramienta." } }
+            functionResponse: {
+              name: toolName,
+              response: { status: 'error', message: 'Error interno ejecutando herramienta.' },
+            },
           });
         }
       }
@@ -149,14 +160,18 @@ class AIService {
 
       const usage = result.response.usageMetadata;
       if (usage) {
-        logger.info(`[IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
+        logger.info(
+          `[IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`
+        );
       }
 
       finalResponse.text = result.response.text();
       currentCalls = result.response.functionCalls();
 
       if (currentCalls && currentCalls.length > 0) {
-        logger.info(`[IA] Gemini pidió más llamadas: ${currentCalls.map(c => c.name).join(', ')}`);
+        logger.info(
+          `[IA] Gemini pidió más llamadas: ${currentCalls.map((c) => c.name).join(', ')}`
+        );
       }
     }
 
@@ -170,7 +185,9 @@ class AIService {
 
     // 1. Quitar el último si es del usuario (porque se enviará en el prompt actual)
     if (sanitized.length > 0 && sanitized[sanitized.length - 1].role === 'user') {
-      logger.info(`[IA] Historial ajustado: quitando último mensaje 'user' para evitar duplicidad.`);
+      logger.info(
+        `[IA] Historial ajustado: quitando último mensaje 'user' para evitar duplicidad.`
+      );
       sanitized.pop();
     }
 
@@ -195,7 +212,7 @@ class AIService {
       // Clonar profundamente el mensaje para no mutar el original
       const safeMsg = JSON.parse(JSON.stringify(msg));
 
-      // Aplicar filtro de falsos positivos SÓLO si es texto 
+      // Aplicar filtro de falsos positivos SÓLO si es texto
       // y respetar function calls / function responses
       if (safeMsg.parts && Array.isArray(safeMsg.parts)) {
         safeMsg.parts = safeMsg.parts.map((p: any) => {
@@ -206,9 +223,13 @@ class AIService {
         });
       }
 
-      if (alternatingHistory.length > 0 && alternatingHistory[alternatingHistory.length - 1].role === safeMsg.role) {
+      if (
+        alternatingHistory.length > 0 &&
+        alternatingHistory[alternatingHistory.length - 1].role === safeMsg.role
+      ) {
         if (safeMsg.role === 'user' && safeMsg.parts && safeMsg.parts[0] && safeMsg.parts[0].text) {
-          alternatingHistory[alternatingHistory.length - 1].parts[0].text += " " + safeMsg.parts[0].text;
+          alternatingHistory[alternatingHistory.length - 1].parts[0].text +=
+            ' ' + safeMsg.parts[0].text;
         }
       } else {
         alternatingHistory.push(safeMsg);
@@ -228,19 +249,27 @@ class AIService {
         // Race contra un timeout de 20s
         return await Promise.race([
           fn(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de 20s en Gemini API")), 20000))
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout de 20s en Gemini API')), 20000)
+          ),
         ]);
       } catch (error: any) {
         lastError = error;
         // Solo reintentar si es un error de red o sobrecarga (500, 503, 429) o timeout
-        const errorMsg = error.message?.toLowerCase() || "";
-        const shouldRetry = errorMsg.includes('timeout') || errorMsg.includes('fetch') || errorMsg.includes('503') || errorMsg.includes('429');
+        const errorMsg = error.message?.toLowerCase() || '';
+        const shouldRetry =
+          errorMsg.includes('timeout') ||
+          errorMsg.includes('fetch') ||
+          errorMsg.includes('503') ||
+          errorMsg.includes('429');
 
         if (!shouldRetry || i === maxRetries - 1) break;
 
         const delay = Math.pow(2, i) * 1000;
-        logger.warn(`[IA] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, { error: error.message });
-        await new Promise(res => setTimeout(res, delay));
+        logger.warn(`[IA] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, {
+          error: error.message,
+        });
+        await new Promise((res) => setTimeout(res, delay));
       }
     }
     throw lastError;

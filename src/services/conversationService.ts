@@ -23,9 +23,11 @@ class ConversationService {
 
     // Obtenemos el tipo validado estrictamente (Fallback a crudo si la migración de BD tiene esquemas raros)
     const parsed = LeadProfileSchema.safeParse(rawLead);
-    const leadData: ILeadProfile = parsed.success ? parsed.data : rawLead as any;
+    const leadData: ILeadProfile = parsed.success ? parsed.data : (rawLead as any);
 
-    logger.info(`Lead existente: ${leadData.name || 'Sin nombre'} | Bot Activo: ${leadData.bot_active} | Etapa: ${leadData.current_step}`);
+    logger.info(
+      `Lead existente: ${leadData.name || 'Sin nombre'} | Bot Activo: ${leadData.bot_active} | Etapa: ${leadData.current_step}`
+    );
 
     // 2. Registrar mensaje del cliente
     logger.info(`Guardando mensaje del cliente en historial...`);
@@ -50,8 +52,10 @@ class ConversationService {
    * Maneja el flujo cuando un humano tiene el control
    */
   async handleHumanIntervention(phone: string, leadData: ILeadProfile, message: string) {
-    logger.warn(`Notificando al dueño que el cliente [${leadData.name || phone}] requiere atención manual.`);
-    await notificationService.notifyHumanRequired(phone, leadData.name || "Cliente", message);
+    logger.warn(
+      `Notificando al dueño que el cliente [${leadData.name || phone}] requiere atención manual.`
+    );
+    await notificationService.notifyHumanRequired(phone, leadData.name || 'Cliente', message);
     return { status: 'human_control' };
   }
 
@@ -70,12 +74,18 @@ class ConversationService {
       // B. Generar respuesta
       logger.info(`Consultando a Gemini...`);
       const aiResponse = await aiService.generateResponse(model, message, history);
-      let responseText = "";
+      let responseText = '';
 
       // C. Manejar Function Calls (si existen)
       if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
-        logger.info(`La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map(c => c.name).join(', ')}`);
-        const result = await aiService.processFunctionCalls(aiResponse.functionCalls, aiResponse.chatSession, phone);
+        logger.info(
+          `La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map((c) => c.name).join(', ')}`
+        );
+        const result = await aiService.processFunctionCalls(
+          aiResponse.functionCalls,
+          aiResponse.chatSession,
+          phone
+        );
         responseText = result.text;
         logger.info(`Herramientas ejecutadas. Respuesta final de IA obtenida.`);
       } else {
@@ -84,9 +94,9 @@ class ConversationService {
       }
 
       // Validación de seguridad para evitar enviar mensajes vacíos a WhatsApp
-      if (!responseText || responseText.trim() === "") {
+      if (!responseText || responseText.trim() === '') {
         logger.warn(`La IA no devolvió texto. Usando respuesta amigable por defecto.`);
-        responseText = "¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾";
+        responseText = '¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾';
       }
 
       // D. Persistir cambios de la sesión (historial con respuesta IA)
@@ -104,10 +114,9 @@ class ConversationService {
       logger.info(`Evento 'ai_response' emitido al Dashboard.`);
 
       return { status: 'ai_responded', text: responseText };
-
     } catch (error: any) {
       logger.error(`Error en flujo de IA [${phone}]`, { error });
-      const errorMsg = "Disculpa, tuve un pequeño problema técnico. ¿Podrías repetirme eso?";
+      const errorMsg = 'Disculpa, tuve un pequeño problema técnico. ¿Podrías repetirme eso?';
       await whatsappService.sendMessage(phone, errorMsg);
       return { status: 'error', error: error.message };
     }
@@ -126,7 +135,11 @@ class ConversationService {
     // 3. Registrar en historial como una nota del sistema
     await chatModel.addMessage(phone, {
       role: 'model',
-      parts: [{ text: `[NOTA DEL SISTEMA: UN AGENTE HUMANO INTERVINO Y LE ENVIÓ EL SIGUIENTE MENSAJE AL CLIENTE]: "${message}"` }]
+      parts: [
+        {
+          text: `[NOTA DEL SISTEMA: UN AGENTE HUMANO INTERVINO Y LE ENVIÓ EL SIGUIENTE MENSAJE AL CLIENTE]: "${message}"`,
+        },
+      ],
     });
 
     // 4. Notificar actualización
@@ -141,11 +154,15 @@ class ConversationService {
   async toggleBot(phone: string, active: boolean) {
     if (active) {
       await leadModel.activateBot(phone);
-      const msg = "¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖";
+      const msg = '¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖';
       await whatsappService.sendMessage(phone, msg);
       await chatModel.addMessage(phone, {
         role: 'model',
-        parts: [{ text: `[NOTA DEL SISTEMA: SE REACTIVÓ A LA IA. EL SISTEMA ENVIÓ ESTE MENSAJE]: "${msg}"` }]
+        parts: [
+          {
+            text: `[NOTA DEL SISTEMA: SE REACTIVÓ A LA IA. EL SISTEMA ENVIÓ ESTE MENSAJE]: "${msg}"`,
+          },
+        ],
       });
     } else {
       await leadModel.deactivateBot(phone);

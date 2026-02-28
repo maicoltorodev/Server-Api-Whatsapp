@@ -6,13 +6,10 @@ class LeadModel {
    * Obtiene un lead por su número de teléfono
    */
   async getByPhone(phone) {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('phone', phone)
-      .single();
+    const { data, error } = await supabase.from('leads').select('*').eq('phone', phone).single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = not found
       logger.error(`BD Error (leadModel.getByPhone) [${phone}]`, { error });
       throw error;
     }
@@ -84,9 +81,10 @@ class LeadModel {
   async updateSummary(phone, summary) {
     const lead = await this.getByPhone(phone);
     const previousSummary = lead?.summary || '';
-    const finalSummary = previousSummary && summary && !previousSummary.includes(summary)
-      ? `${previousSummary} | ${summary}`
-      : (summary || previousSummary);
+    const finalSummary =
+      previousSummary && summary && !previousSummary.includes(summary)
+        ? `${previousSummary} | ${summary}`
+        : summary || previousSummary;
 
     return await this.updateStatus(phone, { summary: finalSummary });
   }
@@ -103,7 +101,7 @@ class LeadModel {
     if (!history.pets) history.pets = [];
 
     // Buscar la mascota por nombre (mactheo case insensitive)
-    let pet = history.pets.find(p => p.name?.toLowerCase() === petName?.toLowerCase());
+    let pet = history.pets.find((p) => p.name?.toLowerCase() === petName?.toLowerCase());
 
     if (!pet) {
       pet = { name: petName, allergies: [], behavior: '', preferences: [], notes: '' };

@@ -18,22 +18,15 @@ class NotificationService {
     logger.warn(`---------- 🛎️ REQUEST HUMANO (DASHBOARD) ----------\n${logContent}`);
 
     // Emitir evento al Dashboard Administrativo mediante SSE
-    systemEvents.emit('human_required', JSON.stringify({
-      phone: clientPhone,
-      name: clientName,
-      message: message,
-      timestamp: new Date().toISOString()
-    }));
-  }
-
-  /**
-   * Envía SMS automatizado al cliente
-   */
-  async sendSMS(to, text) {
-    logger.info(`---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------\nPARA: ${to}\nMENSAJE: ${text}`);
-
-    // Aquí se integraría con Twilio o servicio de SMS real
-    return true;
+    systemEvents.emit(
+      'human_required',
+      JSON.stringify({
+        phone: clientPhone,
+        name: clientName,
+        message: message,
+        timestamp: new Date().toISOString(),
+      })
+    );
   }
 
   /**
@@ -51,7 +44,7 @@ class NotificationService {
   async notifyCancelledAppointment(clientPhone, appointmentData) {
     const message = `⚠️ CITA CANCELADA AUTOMÁTICAMENTE\n🗓️ ${appointmentData.date} a las ${appointmentData.start_time.substring(0, 5)}`;
 
-    await this.notifyOwner(clientPhone, "Cliente", message);
+    await this.notifyOwner(clientPhone, 'Cliente', message);
   }
 
   /**
@@ -70,10 +63,10 @@ class NotificationService {
       const whatsappService = require('./whatsappService');
       await whatsappService.sendMessage(
         clientPhone,
-        "Disculpa, estoy experimentando un pequeño problema técnico 😵‍💫. Un humano tomará mi lugar en breve para ayudarte."
+        'Disculpa, estoy experimentando un pequeño problema técnico 😵‍💫. Un humano tomará mi lugar en breve para ayudarte.'
       );
     } catch (error: any) {
-      logger.error("Error notificando error al cliente", { error });
+      logger.error('Error notificando error al cliente', { error });
     }
   }
 }
