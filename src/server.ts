@@ -27,6 +27,7 @@ app.use('/api/admin', adminRoutes);
 const startServer = async () => {
   await ConfigProvider.init();
   const server = app.listen(config.PORT, () => {
+    // REINICIO FORZADO POR ANTIGRAVITY
     logger.info(`SERVIDOR ENTERPRISE ACTIVO - Puerto: ${config.PORT}`);
   });
 
