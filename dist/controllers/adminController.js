@@ -90,13 +90,13 @@ class AdminController {
      */
     async refreshConfig(req, res) {
         try {
-            const cacheManager = require('../utils/cache');
-            cacheManager.invalidateConfig();
-            res.json({ status: 'success', message: 'Cache refrescado con éxito.' });
+            const ConfigProvider = require('../core/config/ConfigProvider').default;
+            await ConfigProvider.reload();
+            res.json({ status: 'success', message: 'Configuración recargada exitosamente en RAM.' });
         }
         catch (error) {
             logger.error("Dashboard Error (refreshConfig)", { error });
-            res.status(500).json({ status: 'error', message: 'Error al invalidar cache' });
+            res.status(500).json({ status: 'error', message: 'Error recargando la configuración' });
         }
     }
     /**

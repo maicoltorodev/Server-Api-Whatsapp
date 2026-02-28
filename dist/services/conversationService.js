@@ -7,21 +7,23 @@ const whatsappService = require('./whatsappService');
 const notificationService = require('./notificationService');
 const systemEvents = require('../utils/eventEmitter');
 const logger = require('../utils/logger').default;
+const types_1 = require("../types");
 class ConversationService {
     /**
      * Procesa un mensaje entrante de un cliente de principio a fin
      */
     async handleIncomingMessage(phone, message) {
         logger.info(`--- 🤖 ORQUESTADOR DE CONVERSACIÓN: ${phone} ---`);
-        // 1. Obtener o crear Lead
-        let leadData = await leadModel.getByPhone(phone);
-        if (!leadData) {
+        // 1. Obtener o crear Lead Raw
+        let rawLead = await leadModel.getByPhone(phone);
+        if (!rawLead) {
             logger.info(`Lead nuevo detectado. Creando perfil inicial para ${phone}...`);
-            leadData = await leadModel.upsert({ phone, name: 'Nuevo Cliente', bot_active: true });
+            rawLead = await leadModel.upsert({ phone, name: 'Nuevo Cliente', bot_active: true });
         }
-        else {
-            logger.info(`Lead existente: ${leadData.name || 'Sin nombre'} | Bot Activo: ${leadData.bot_active} | Etapa: ${leadData.current_step}`);
-        }
+        // Obtenemos el tipo validado estrictamente (Fallback a crudo si la migración de BD tiene esquemas raros)
+        const parsed = types_1.LeadProfileSchema.safeParse(rawLead);
+        const leadData = parsed.success ? parsed.data : rawLead;
+        logger.info(`Lead existente: ${leadData.name || 'Sin nombre'} | Bot Activo: ${leadData.bot_active} | Etapa: ${leadData.current_step}`);
         // 2. Registrar mensaje del cliente
         logger.info(`Guardando mensaje del cliente en historial...`);
         await chatModel.addMessage(phone, { role: 'user', parts: [{ text: message }] });
@@ -52,12 +54,12 @@ class ConversationService {
         try {
             // A. Preparar contexto e historial
             logger.info(`Preparando contexto dinámico (catálogo, etapa, resumen)...`);
-            await aiService.prepareContext(leadData);
+            const model = await aiService.prepareContext(leadData);
             const history = await chatModel.getHistory(phone);
             logger.info(`Historial cargado: ${history.length} mensajes previos.`);
             // B. Generar respuesta
             logger.info(`Consultando a Gemini...`);
-            const aiResponse = await aiService.generateResponse(message, history);
+            const aiResponse = await aiService.generateResponse(model, message, history);
             let responseText = "";
             // C. Manejar Function Calls (si existen)
             if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {

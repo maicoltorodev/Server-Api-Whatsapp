@@ -48,13 +48,16 @@ class MessageQueue {
         // 2. Combinamos todo de forma natural (con un '. ' entre párrafos o solo un espacio)
         const combinedText = userQueue.messages.join('. ');
         logger.info(`[BLOQUE COMBINADO LISTO] -> Enviando a IA\nUsuario: ${from}\nUnificado (${userQueue.messages.length} envíos en 1): "${combinedText}"`);
-        // 3. Ahora sí, le entregamos la conversación al Orquestador de la IA (Ahorramos Tokens)
-        try {
-            await conversationService.handleIncomingMessage(from, combinedText);
-        }
-        catch (error) {
-            logger.error("Error procesando ráfaga combinada", { error });
-        }
+        // 3. Ahora sí, lo encolamos en el embudo asíncrono seguro (Protegiendo el servidor de ráfagas)
+        const concurrencyQueue = require('./ConcurrencyQueue').default;
+        concurrencyQueue.enqueue(async () => {
+            try {
+                await conversationService.handleIncomingMessage(from, combinedText);
+            }
+            catch (error) {
+                logger.error("Error crítico procesando mensaje desde la cola de concurrencia", { error });
+            }
+        });
     }
 }
 module.exports = new MessageQueue();

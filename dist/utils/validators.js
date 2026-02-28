@@ -1,8 +1,9 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * Funciones de validación para fechas, horas y otros datos
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+const DateUtils = require('./DateUtils').default;
 function isValidDate(dateStr) {
     return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
@@ -12,20 +13,15 @@ function isValidTime(timeStr) {
 function isFutureDate(dateStr) {
     if (!isValidDate(dateStr))
         return false;
-    const now = new Date(); // Instante UTC absoluto
-    // Lo forzamos a 00:00 del día actual en sudamérica (GMT-5). Restamos 5 hrs.
-    const bogotaZero = new Date(now.getTime() - (5 * 60 * 60 * 1000));
-    bogotaZero.setUTCHours(0, 0, 0, 0);
-    // Parseamos el input simulando que también es UTC a las 00:00 para alinear peras con peras
-    const inputDate = new Date(`${dateStr}T00:00:00Z`);
-    return inputDate.getTime() >= bogotaZero.getTime();
+    const bogotaZeroToday = DateUtils.getBogotaZeroToday();
+    const inputDate = DateUtils.createBogotaDate(dateStr);
+    return inputDate.getTime() >= bogotaZeroToday.getTime();
 }
 function isFutureDateTime(dateStr, timeStr) {
     if (!isValidDate(dateStr) || !isValidTime(timeStr))
         return false;
-    // Al crear targetDate con -05:00, JS genera el timestamp Epoch correcto al instante absoluto de la línea del tiempo.
-    const targetDate = new Date(`${dateStr}T${timeStr}:00-05:00`);
-    const now = new Date(); // Timestamp Epoch instantáneo real, sin importar en qué servidor esté.
+    const targetDate = DateUtils.createBogotaDate(dateStr, timeStr);
+    const now = DateUtils.getNow();
     return targetDate.getTime() > now.getTime();
 }
 function isWithinBusinessHours(startTime, endTime, businessStart = "09:00", businessEnd = "17:00") {

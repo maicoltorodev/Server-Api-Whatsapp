@@ -1,76 +1,39 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const { genAI, tools } = require('../config/ai');
-const cacheManager = require('../utils/cache');
 const config = require('../config');
 const toolService = require('./toolService');
 const logger = require('../utils/logger').default;
+const ConfigProvider = require('../core/config/ConfigProvider').default;
+const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
 class AIService {
-    model;
-    constructor() {
-        this.model = null;
-    }
+    constructor() { }
     /**
-     * Inicializa el modelo con la instrucción de sistema dinámica
+     * Inicializa el modelo usando la memoria RAM (Cero Queries)
+     * Retorna una instancia de modelo configurada para este usuario/contexto.
      */
     async initializeModel(leadData) {
-        logger.info(`[IA] Inicializando modelo Flash (Latest)...`);
-        const currentTime = new Date().toLocaleString("es-CO", { timeZone: config.TIMEZONE });
-        const currentStage = leadData?.current_step || 'SALUDO';
-        const userSummary = leadData?.summary || 'Nuevo cliente.';
-        // Parsear stringificación del JSONB si es necesario
-        let medicalHistory = 'Ninguno registrado aún.';
-        if (leadData?.medical_history) {
-            if (leadData.medical_history.pets) {
-                medicalHistory = leadData.medical_history.pets.map(p => `🐾 MASCOTA: ${p.name}\n- Alergias: ${p.allergies?.join(', ') || 'Ninguna'}\n- Conducta: ${p.behavior || 'N/A'}\n- Preferencias: ${p.preferences?.join(', ') || 'N/A'}`).join('\n\n');
-            }
-            else {
-                // Fallback para datos antiguos o flat
-                medicalHistory = JSON.stringify(leadData.medical_history, null, 2);
-            }
-        }
-        const servicesCatalog = await cacheManager.getCatalog();
-        const agendaConfig = await cacheManager.getAgendaConfig();
-        logger.info(`[IA] Contexto: Etapa=${currentStage} | Resumen: ${userSummary.substring(0, 30)}...`);
-        const systemInstruction = `Eres "${agendaConfig.agentName || 'Asistente'}", la asistente virtual de "${agendaConfig.siteName || 'Pet Care Studio'}". 
-    PERSONALIDAD: ${agendaConfig.agentPersonality || 'Amigable, profesional y apasionada por las mascotas.'}
-    
-    🗓️ HORA ACTUAL: ${currentTime}
-    ESTADO CLIENTE: ${currentStage}. 
-    RESUMEN RECIENTE (Chat Corto Plazo): ${userSummary}.
-
-    🧠 FICHAS CLÍNICAS (Memoria a Largo Plazo):
-    En este apartado verás la información de las mascotas del cliente. Un cliente puede tener varias mascotas.
-    ${medicalHistory}
-    (Usa OBLIGATORIAMENTE esta información clínica antes de ofrecer servicios para cada mascota específica).
-
-    
-    SERVICIOS DISPONIBLES:
-    ${servicesCatalog}
-    
-    HORARIOS DE ATENCIÓN:
-    ${agendaConfig.business_hours_text || '- Lunes a Sábado: 09:00 AM a 05:00 PM (17:00).'}
-    ${agendaConfig.closed_days_text ? `\nDÍAS CERRADOS:\n${agendaConfig.closed_days_text}` : '\n- Domingos: Cerrado.'}
-    
-    REGLAS DE NEGOCIO EN EL ESTUDIO:
-    ${agendaConfig.businessRules || 'Tratar a cada mascota con amor.'}
-    
-    INSTRUCCIONES MAESTRAS:
-    ${agendaConfig.masterPrompt || 'Tu objetivo es ayudar al cliente a agendar citas y resolver dudas. Sé concisa y amable.'}
-
-    REGLAS DE ORO (OBLIGATORIAS):
-    1. PROHIBIDO decir "Déjame revisar", "Dame un momento", "Ya te confirmo" o similares. Tienes acceso instantáneo a la agenda.
-    2. Si necesitas verificar algo (como disponibilidad), ejecuta 'check_availability' DE INMEDIATO y responde directamente con el resultado que recibas.
-    3. Nunca des una respuesta de texto que prometa una acción futura; realiza la acción AHORA usando las herramientas.
-    4. Sé concisa y amable. Usa Emojis 🐾.
-    5. Citas -> Usa 'check_availability' para ver huecos y 'book_appointment' SOLO cuando el cliente acepte un horario específico.
-    6. Traspaso humano -> Solo si el cliente lo pide o está frustrado, usa 'transfer_to_human'.`;
-        this.model = genAI.getGenerativeModel({
-            model: "gemini-flash-latest", // Alias dinámico al mejor flash disponible
+        logger.info(`[IA] Inicializando instancia de modelo para ${leadData?.phone}...`);
+        // Obtener configuración inmutable desde RAM
+        const appConfig = ConfigProvider.getConfig();
+        const catalogString = ConfigProvider.getCatalogString();
+        // Construir el Prompt Maestro Modularmente
+        const systemInstruction = new SystemPromptBuilder()
+            .setTimeContext(config.TIMEZONE)
+            .setLeadContext(leadData?.current_step, leadData?.summary)
+            .setMedicalHistory(leadData?.medical_history)
+            .setCatalog(catalogString)
+            .setOperations(appConfig)
+            .setMasterInstructions(appConfig)
+            .setHardcodedRules()
+            .build();
+        const modelObj = genAI.getGenerativeModel({
+            model: "gemini-flash-latest",
             tools: [tools],
             systemInstruction
         });
-        logger.info(`[IA] Modelo listo.`);
+        logger.info(`[IA] Pre-Prompt Ensamblado: ${systemInstruction.length} caracteres.`);
+        return modelObj;
     }
     /**
      * Alias para inicialización rápida
@@ -81,28 +44,18 @@ class AIService {
     /**
      * Genera una respuesta manejando el historial de forma segura
      */
-    async generateResponse(message, history = []) {
-        if (!this.model)
+    async generateResponse(model, message, history = []) {
+        if (!model)
             throw new Error("IA no inicializada.");
         const sanitizedHistory = this._sanitizeHistory(history);
         logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs).`);
-        const chatSession = this.model.startChat({
+        const chatSession = model.startChat({
             history: sanitizedHistory
         });
         logger.info(`[IA] Enviando prompt: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
-        let result;
-        try {
-            logger.info("[DEBUG] Ejecutando chatSession.sendMessage...");
-            result = await Promise.race([
-                chatSession.sendMessage(message),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de 20s en Gemini API")), 20000))
-            ]);
-            logger.info("[DEBUG] chatSession.sendMessage finalizado con éxito.");
-        }
-        catch (apiError) {
-            logger.error(`[IA] Error en Gemini API durante sendMessage: ${apiError.message}`, { error: apiError });
-            throw apiError;
-        }
+        const result = await this._withRetry(async () => {
+            return await chatSession.sendMessage(message);
+        });
         const usage = result?.response?.usageMetadata;
         if (usage) {
             logger.info(`[IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
@@ -146,8 +99,10 @@ class AIService {
                     });
                 }
             }
-            // Enviar todos los resultados de una vez
-            const result = await chatSession.sendMessage(toolResponses);
+            // Enviar todos los resultados de una vez con reintentos
+            const result = await this._withRetry(async () => {
+                return await chatSession.sendMessage(toolResponses);
+            });
             const usage = result.response.usageMetadata;
             if (usage) {
                 logger.info(`[IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
@@ -193,6 +148,33 @@ class AIService {
             }
         }
         return alternatingHistory;
+    }
+    /**
+     * Envuelve una promesa con lógica de reintento exponencial
+     */
+    async _withRetry(fn, maxRetries = 3) {
+        let lastError;
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                // Race contra un timeout de 20s
+                return await Promise.race([
+                    fn(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout de 20s en Gemini API")), 20000))
+                ]);
+            }
+            catch (error) {
+                lastError = error;
+                // Solo reintentar si es un error de red o sobrecarga (500, 503, 429) o timeout
+                const errorMsg = error.message?.toLowerCase() || "";
+                const shouldRetry = errorMsg.includes('timeout') || errorMsg.includes('fetch') || errorMsg.includes('503') || errorMsg.includes('429');
+                if (!shouldRetry || i === maxRetries - 1)
+                    break;
+                const delay = Math.pow(2, i) * 1000;
+                logger.warn(`[IA] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, { error: error.message });
+                await new Promise(res => setTimeout(res, delay));
+            }
+        }
+        throw lastError;
     }
 }
 module.exports = new AIService();

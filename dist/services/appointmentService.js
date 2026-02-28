@@ -1,11 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const supabase = require('../config/database');
-const cacheManager = require('../utils/cache');
+const ConfigProvider = require('../core/config/ConfigProvider').default;
 const { isValidDate, isValidTime, isFutureDate, isFutureDateTime, isWithinBusinessHours } = require('../utils/validators');
 const notificationService = require('./notificationService');
 const config = require('../config');
 const logger = require('../utils/logger').default;
+const DateUtils = require('../utils/DateUtils').default;
 class AppointmentService {
     /**
      * Verifica disponibilidad para una fecha específica
@@ -18,8 +19,8 @@ class AppointmentService {
                 message: "La fecha proporcionada tiene un formato inválido. Debe ser YYYY-MM-DD."
             };
         }
-        const agendaConfig = await cacheManager.getAgendaConfig();
-        const checkDate = new Date(`${date}T12:00:00-05:00`);
+        const agendaConfig = ConfigProvider.getConfig().hours;
+        const checkDate = DateUtils.createBogotaDate(date, "12:00");
         // Verificar si es un día cerrado
         const closedDays = agendaConfig.closedDays || [];
         if (closedDays.includes(checkDate.getDay())) {
@@ -67,33 +68,36 @@ class AppointmentService {
      */
     generateAvailableSlots(date, config, existingAppointments, durationMinutes) {
         const libres = [];
-        let currentSlot = new Date(`${date}T${config.open}:00-05:00`);
-        const closingTime = new Date(`${date}T${config.close}:00-05:00`);
+        let currentSlot = DateUtils.createBogotaDate(date, config.open);
+        const closingTime = DateUtils.createBogotaDate(date, config.close);
         const duration = parseInt(durationMinutes) || config.defaultDuration || 60;
-        // Obtener epoch crudo de la hora real
-        const now = new Date();
+        const nowBogotaStr = DateUtils.getTodayBogotaStr();
+        const now = DateUtils.getNow();
         while (currentSlot < closingTime) {
             const testStart = new Date(currentSlot);
-            const testEnd = new Date(testStart.getTime() + duration * 60 * 1000);
+            const testEnd = DateUtils.addMinutes(testStart, duration);
             // Si el servicio termina después del cierre, truncar la iteración futura
             if (testEnd > closingTime) {
                 break;
             }
-            // Si la hora de inicio es en el pasado absoluto, omitir y avanzar al siguiente
-            if (testStart.getTime() <= now.getTime()) {
-                currentSlot = new Date(currentSlot.getTime() + 30 * 60 * 1000);
-                continue;
+            // IMPORTANTE: Solo bloquear horas del pasado si la fecha consultada es HOY.
+            // Si la cita es para mañana o después, todas las horas (desde apertura) son válidas.
+            if (date === nowBogotaStr) {
+                if (testStart.getTime() <= now.getTime()) {
+                    currentSlot = DateUtils.addMinutes(currentSlot, 30);
+                    continue;
+                }
             }
-            const timeString = `${currentSlot.getHours().toString().padStart(2, '0')}:${currentSlot.getMinutes().toString().padStart(2, '0')}`;
+            const timeString = DateUtils.getBogotaTimeString(currentSlot);
             // Verificar solapamientos para todo el intervalo de [testStart a testEnd]
             let overlappingCount = 0;
             existingAppointments.forEach(appointment => {
                 // Normalizar tiempos de bbd (a veces vienen HH:mm:ss)
                 const sTime = appointment.start_time.substring(0, 5);
                 const eTime = appointment.end_time.substring(0, 5);
-                const aStart = new Date(`${date}T${sTime}:00-05:00`);
-                const aEnd = new Date(`${date}T${eTime}:00-05:00`);
-                const aEndWithBuffer = new Date(aEnd.getTime() + (config.buffer || 0) * 60 * 1000);
+                const aStart = DateUtils.createBogotaDate(date, sTime);
+                const aEnd = DateUtils.createBogotaDate(date, eTime);
+                const aEndWithBuffer = DateUtils.addMinutes(aEnd, config.buffer || 0);
                 // Si hay cualquier intersección en el rango de tiempo
                 if (testStart < aEndWithBuffer && testEnd > aStart) {
                     overlappingCount++;
@@ -104,7 +108,7 @@ class AppointmentService {
                 libres.push(timeString);
             }
             // Avanzar en intervalos de 30 minutos (los turnos empiezan en punto o y media)
-            currentSlot = new Date(currentSlot.getTime() + 30 * 60 * 1000);
+            currentSlot = DateUtils.addMinutes(currentSlot, 30);
         }
         return libres;
     }
@@ -117,6 +121,20 @@ class AppointmentService {
             return {
                 status: "error",
                 message: "El formato de fecha (YYYY-MM-DD) o la hora (HH:MM) es inválido."
+            };
+        }
+        if (!pet_name || pet_name.trim() === '') {
+            return {
+                status: "error",
+                message: "Nombre de la mascota no proporcionado. Debes preguntar y registrar el nombre exacto de la mascota."
+            };
+        }
+        // Validación Anti-Quimera (Detectar intentos de colar varias mascotas en 1 string)
+        const petNameLower = pet_name.toLowerCase();
+        if (petNameLower.includes(' y ') || petNameLower.includes(' e ') || petNameLower.includes(' and ') || petNameLower.includes(',')) {
+            return {
+                status: "error",
+                message: "Prohibido agrupar múltiples mascotas en un solo turno. Debes ejecutar 'book_appointment' una vez MÁS por cada mascota separadamente."
             };
         }
         if (!isFutureDate(date)) {
@@ -132,7 +150,7 @@ class AppointmentService {
             };
         }
         // --- Validación Real de Catálogo (Anti-Alucinaciones) ---
-        const catalogArray = await cacheManager.getCatalogArray();
+        const catalogArray = ConfigProvider.getCatalogArray();
         let finalDuration = parseInt(duration_minutes) || 60;
         let finalService = service || 'Servicio General';
         // Si la BD retornó el catálogo real, forzamos concordancia estricta
@@ -152,19 +170,11 @@ class AppointmentService {
             // Sanitizamos el nombre del texto a guardar
             finalService = serviceFound.title;
         }
-        const agendaConfig = await cacheManager.getAgendaConfig();
-        // Función auxiliar para crear fecha en Bogotá (GMT-5) sin depender del sistema
-        const createBogotaDate = (d, t) => {
-            // t puede ser HH:mm o HH:mm:ss
-            const time = (t || "00:00").substring(0, 5);
-            return new Date(`${d}T${time}:00-05:00`);
-        };
-        const exactStart = createBogotaDate(date, start_time);
-        const exactEnd = new Date(exactStart.getTime() + (finalDuration * 60 * 1000));
-        const closingTime = createBogotaDate(date, agendaConfig.close || "17:00");
-        // Para visualizar end_time correctamente en GMT-5 (BOG)
-        const bogotaClock = new Date(exactEnd.getTime() - (5 * 60 * 60 * 1000));
-        const end_time = `${bogotaClock.getUTCHours().toString().padStart(2, '0')}:${bogotaClock.getUTCMinutes().toString().padStart(2, '0')}`;
+        const agendaConfig = ConfigProvider.getConfig().hours;
+        const exactStart = DateUtils.createBogotaDate(date, start_time);
+        const exactEnd = DateUtils.addMinutes(exactStart, finalDuration);
+        const closingTime = DateUtils.createBogotaDate(date, agendaConfig.close || "17:00");
+        const end_time = DateUtils.getBogotaTimeString(exactEnd);
         logger.debug(`Validando: Termina ${end_time} vs Cierre ${agendaConfig.close}`);
         if (exactEnd.getTime() > closingTime.getTime()) {
             return {
@@ -242,20 +252,30 @@ class AppointmentService {
     /**
      * Cancela una cita existente
      */
-    async cancelAppointment(phone, { date }) {
+    async cancelAppointment(phone, { date, start_time }) {
         if (!isValidDate(date)) {
             return {
                 status: "error",
                 message: "Fecha inválida (usa YYYY-MM-DD)."
             };
         }
+        if (!isValidTime(start_time)) {
+            return {
+                status: "error",
+                message: "Hora inválida o no proporcionada (usa HH:MM). Es OBLIGATORIO proveer la hora exacta de la cita a cancelar."
+            };
+        }
         try {
-            const { data: appointments, error } = await supabase
+            let query = supabase
                 .from('appointments')
                 .select('*')
                 .eq('phone', phone)
                 .eq('appointment_date', date)
-                .neq('status', 'cancelada')
+                .neq('status', 'cancelada');
+            if (start_time) {
+                query = query.eq('start_time', start_time);
+            }
+            const { data: appointments, error } = await query
                 .order('created_at', { ascending: false })
                 .limit(1);
             if (error || !appointments || appointments.length === 0) {

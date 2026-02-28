@@ -28,7 +28,12 @@ class WhatsAppService {
             logger.info(`Mensaje enviado a ${to}: ${text.substring(0, 50)}...`);
         }
         catch (error) {
-            logger.error("Error enviando mensaje WhatsApp", { error: error.response?.data || error.message });
+            const errorData = error.response?.data;
+            logger.error("Error enviando mensaje WhatsApp", {
+                message: error.message,
+                metaError: errorData,
+                stack: error.stack
+            });
             throw error;
         }
     }
@@ -41,9 +46,7 @@ class WhatsAppService {
                 messaging_product: "whatsapp",
                 status: "read",
                 message_id: messageId
-            }, {
-                headers: { 'Authorization': `Bearer ${config.WHATSAPP_TOKEN}` }
-            });
+            }, { headers: this.headers });
         }
         catch (error) {
             logger.error("Error marcando mensaje como leído", { error: error.response?.data || error.message });
