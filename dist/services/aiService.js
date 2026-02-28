@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const { genAI, tools } = require('../config/ai');
+const { HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
 const config = require('../config');
 const toolService = require('./toolService');
 const logger = require('../utils/logger').default;
@@ -27,10 +28,29 @@ class AIService {
             .setMasterInstructions(appConfig)
             .setHardcodedRules()
             .build();
+        const safetySettings = [
+            {
+                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+        ];
         const modelObj = genAI.getGenerativeModel({
             model: "gemini-flash-latest",
             tools: [tools],
-            systemInstruction
+            systemInstruction,
+            safetySettings
         });
         logger.info(`[IA] Pre-Prompt Ensamblado: ${systemInstruction.length} caracteres.`);
         return modelObj;
