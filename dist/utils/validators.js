@@ -24,17 +24,14 @@ function isFutureDateTime(dateStr, timeStr) {
     const now = DateUtils.getNow();
     return targetDate.getTime() > now.getTime();
 }
-function isWithinBusinessHours(startTime, endTime, businessStart = "09:00", businessEnd = "17:00") {
+function isWithinBusinessHours(startTime, endTime, businessStart = '09:00', businessEnd = '17:00') {
     return startTime >= businessStart && endTime <= businessEnd;
 }
 function sanitizePhoneNumber(phone) {
     return phone.replace(/\D/g, '');
 }
 function isValidWhatsAppMessage(message) {
-    return message &&
-        message.type === 'text' &&
-        message.text &&
-        message.text.body;
+    return message && message.type === 'text' && message.text && message.text.body;
 }
 module.exports = {
     isValidDate,
@@ -43,5 +40,5 @@ module.exports = {
     isFutureDateTime,
     isWithinBusinessHours,
     sanitizePhoneNumber,
-    isValidWhatsAppMessage
+    isValidWhatsAppMessage,
 };

@@ -11,29 +11,29 @@ function verifyMetaSignature(req, res, next) {
     const signature = req.headers['x-hub-signature-256'];
     // 1. Validar presencia de la firma
     if (!signature) {
-        logger.warn("Webhook security alert", {
-            event: "webhook_security_alert",
-            reason: "missing_signature",
+        logger.warn('Webhook security alert', {
+            event: 'webhook_security_alert',
+            reason: 'missing_signature',
             ip: req.ip || req.connection?.remoteAddress,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         });
         return res.sendStatus(403);
     }
     // 2. Validar formato de la firma (sha256=...)
     const elements = signature.split('=');
     if (elements.length !== 2 || elements[0] !== 'sha256') {
-        logger.warn("Webhook security alert", {
-            event: "webhook_security_alert",
-            reason: "invalid_signature_format",
+        logger.warn('Webhook security alert', {
+            event: 'webhook_security_alert',
+            reason: 'invalid_signature_format',
             signature_received: signature,
             ip: req.ip || req.connection?.remoteAddress,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         });
         return res.sendStatus(403);
     }
     const signatureHash = elements[1];
     if (!config.META_APP_SECRET || config.META_APP_SECRET === 'placeholder_secret_para_dev') {
-        logger.warn("ALERTA DE SEGURIDAD: META_APP_SECRET no está configurado correctamente para producción. La validación podría ser inefectiva.");
+        logger.warn('ALERTA DE SEGURIDAD: META_APP_SECRET no está configurado correctamente para producción. La validación podría ser inefectiva.');
     }
     // 3. Calcular el hash con el APP SECRET de Meta
     const expectedHash = crypto
@@ -45,27 +45,28 @@ function verifyMetaSignature(req, res, next) {
         const signatureBuffer = Buffer.from(signatureHash, 'hex');
         const expectedBuffer = Buffer.from(expectedHash, 'hex');
         // Revisar si las longitudes coinciden para evitar un error en timingSafeEqual
-        if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
-            logger.error("Webhook security alert", {
-                event: "webhook_security_alert",
-                reason: "signature_mismatch",
-                message: "FIRMA INVÁLIDA DETECTADA: Spoofing detenido.",
+        if (signatureBuffer.length !== expectedBuffer.length ||
+            !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+            logger.error('Webhook security alert', {
+                event: 'webhook_security_alert',
+                reason: 'signature_mismatch',
+                message: 'FIRMA INVÁLIDA DETECTADA: Spoofing detenido.',
                 expected_hash: expectedHash,
                 received_hash: signatureHash,
                 ip: req.ip || req.connection?.remoteAddress,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
             });
             return res.sendStatus(403);
         }
     }
     catch (error) {
         // En caso de que la firma recibida no sea un hex válido y cause un fallo al convertir a buffer
-        logger.error("Webhook security alert", {
-            event: "webhook_security_alert",
-            reason: "signature_processing_error",
+        logger.error('Webhook security alert', {
+            event: 'webhook_security_alert',
+            reason: 'signature_processing_error',
             error: error.message,
             ip: req.ip || req.connection?.remoteAddress,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         });
         return res.sendStatus(403);
     }

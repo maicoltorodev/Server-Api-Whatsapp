@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(express.json({
     verify: (req, res, buf) => {
         req.rawBody = buf.toString();
-    }
+    },
 }));
 // Ruta de verificación del webhook (GET)
 router.get('/', (req, res) => webhookController.verifyWebhook(req, res));

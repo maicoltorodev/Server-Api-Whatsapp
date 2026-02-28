@@ -51,7 +51,7 @@ class ConcurrencyQueue {
     async waitForEmpty() {
         if (this.running === 0 && this.queue.length === 0)
             return;
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             const check = () => {
                 if (this.running === 0 && this.queue.length === 0) {
                     resolve();

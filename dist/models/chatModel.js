@@ -12,7 +12,8 @@ class ChatModel {
             .select('history')
             .eq('phone', phone)
             .single();
-        if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+        if (error && error.code !== 'PGRST116') {
+            // PGRST116 = not found
             logger.error(`BD Error (chatModel.getHistory) [${phone}]`, { error });
             throw error;
         }
@@ -27,7 +28,7 @@ class ChatModel {
             .upsert({
             phone: phone,
             history: history,
-            updated_at: new Date()
+            updated_at: new Date(),
         }, { onConflict: 'phone' })
             .select()
             .single();
@@ -51,10 +52,7 @@ class ChatModel {
      * Limpia el historial de chat de un número
      */
     async clearHistory(phone) {
-        const { data, error } = await supabase
-            .from('chats')
-            .delete()
-            .eq('phone', phone);
+        const { data, error } = await supabase.from('chats').delete().eq('phone', phone);
         if (error) {
             logger.error(`BD Error (chatModel.clearHistory) [${phone}]`, { error });
             throw error;

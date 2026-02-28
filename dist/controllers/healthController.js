@@ -17,10 +17,10 @@ class HealthController {
             services: {
                 database: 'unknown',
                 ai: 'unknown',
-                whatsapp: 'unknown'
+                whatsapp: 'unknown',
             },
             uptime: process.uptime(),
-            memory: process.memoryUsage()
+            memory: process.memoryUsage(),
         };
         try {
             // Verificar conexión a base de datos
@@ -55,7 +55,9 @@ class HealthController {
         }
         const statusCode = healthStatus.services.database === 'healthy' &&
             healthStatus.services.ai === 'healthy' &&
-            healthStatus.services.whatsapp === 'healthy' ? 200 : 503;
+            healthStatus.services.whatsapp === 'healthy'
+            ? 200
+            : 503;
         res.status(statusCode).json(healthStatus);
     }
 }

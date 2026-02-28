@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const supabase = require('../config/database');
 const ConfigProvider = require('../core/config/ConfigProvider').default;
-const { isValidDate, isValidTime, isFutureDate, isFutureDateTime, isWithinBusinessHours } = require('../utils/validators');
+const { isValidDate, isValidTime, isFutureDate, isFutureDateTime, isWithinBusinessHours, } = require('../utils/validators');
 const notificationService = require('./notificationService');
 const config = require('../config');
 const logger = require('../utils/logger').default;
@@ -15,18 +15,18 @@ class AppointmentService {
         // Validaciones básicas
         if (!isValidDate(date)) {
             return {
-                status: "error",
-                message: "La fecha proporcionada tiene un formato inválido. Debe ser YYYY-MM-DD."
+                status: 'error',
+                message: 'La fecha proporcionada tiene un formato inválido. Debe ser YYYY-MM-DD.',
             };
         }
         const agendaConfig = ConfigProvider.getConfig().hours;
-        const checkDate = DateUtils.createBogotaDate(date, "12:00");
+        const checkDate = DateUtils.createBogotaDate(date, '12:00');
         // Verificar si es un día cerrado
         const closedDays = agendaConfig.closedDays || [];
         if (closedDays.includes(checkDate.getDay())) {
             return {
-                status: "error",
-                message: `Lo siento, los días de la fecha solicitada nuestro estudio está cerrado.`
+                status: 'error',
+                message: `Lo siento, los días de la fecha solicitada nuestro estudio está cerrado.`,
             };
         }
         try {
@@ -37,29 +37,29 @@ class AppointmentService {
                 .eq('appointment_date', date)
                 .neq('status', 'cancelada');
             if (error) {
-                logger.error("Error consultando disponibilidad", { error });
+                logger.error('Error consultando disponibilidad', { error });
                 return {
-                    status: "error",
-                    message: "Lo siento, hubo un problema consultando el calendario."
+                    status: 'error',
+                    message: 'Lo siento, hubo un problema consultando el calendario.',
                 };
             }
             // Generar slots disponibles
             const availableSlots = this.generateAvailableSlots(date, agendaConfig, appointments, duration_minutes);
             return {
-                status: "success",
+                status: 'success',
                 date: date,
                 requested_time: time || 'any',
                 available_slots: availableSlots,
                 message: availableSlots.length > 0
-                    ? "Estos son los bloques de media hora libres."
-                    : "Ese día está completamente ocupado."
+                    ? 'Estos son los bloques de media hora libres.'
+                    : 'Ese día está completamente ocupado.',
             };
         }
         catch (error) {
-            logger.error("Error en checkAvailability", { error });
+            logger.error('Error en checkAvailability', { error });
             return {
-                status: "error",
-                message: "Error interno del sistema."
+                status: 'error',
+                message: 'Error interno del sistema.',
             };
         }
     }
@@ -91,7 +91,7 @@ class AppointmentService {
             const timeString = DateUtils.getBogotaTimeString(currentSlot);
             // Verificar solapamientos para todo el intervalo de [testStart a testEnd]
             let overlappingCount = 0;
-            existingAppointments.forEach(appointment => {
+            existingAppointments.forEach((appointment) => {
                 // Normalizar tiempos de bbd (a veces vienen HH:mm:ss)
                 const sTime = appointment.start_time.substring(0, 5);
                 const eTime = appointment.end_time.substring(0, 5);
@@ -119,34 +119,37 @@ class AppointmentService {
         // Validaciones
         if (!isValidDate(date) || !isValidTime(start_time)) {
             return {
-                status: "error",
-                message: "El formato de fecha (YYYY-MM-DD) o la hora (HH:MM) es inválido."
+                status: 'error',
+                message: 'El formato de fecha (YYYY-MM-DD) o la hora (HH:MM) es inválido.',
             };
         }
         if (!pet_name || pet_name.trim() === '') {
             return {
-                status: "error",
-                message: "Nombre de la mascota no proporcionado. Debes preguntar y registrar el nombre exacto de la mascota."
+                status: 'error',
+                message: 'Nombre de la mascota no proporcionado. Debes preguntar y registrar el nombre exacto de la mascota.',
             };
         }
         // Validación Anti-Quimera (Detectar intentos de colar varias mascotas en 1 string)
         const petNameLower = pet_name.toLowerCase();
-        if (petNameLower.includes(' y ') || petNameLower.includes(' e ') || petNameLower.includes(' and ') || petNameLower.includes(',')) {
+        if (petNameLower.includes(' y ') ||
+            petNameLower.includes(' e ') ||
+            petNameLower.includes(' and ') ||
+            petNameLower.includes(',')) {
             return {
-                status: "error",
-                message: "Prohibido agrupar múltiples mascotas en un solo turno. Debes ejecutar 'book_appointment' una vez MÁS por cada mascota separadamente."
+                status: 'error',
+                message: "Prohibido agrupar múltiples mascotas en un solo turno. Debes ejecutar 'book_appointment' una vez MÁS por cada mascota separadamente.",
             };
         }
         if (!isFutureDate(date)) {
             return {
-                status: "error",
-                message: "No se puede agendar una cita en el pasado."
+                status: 'error',
+                message: 'No se puede agendar una cita en el pasado.',
             };
         }
         if (!isFutureDateTime(date, start_time)) {
             return {
-                status: "error",
-                message: "No se puede agendar una cita en una hora que ya pasó."
+                status: 'error',
+                message: 'No se puede agendar una cita en una hora que ya pasó.',
             };
         }
         // --- Validación Real de Catálogo (Anti-Alucinaciones) ---
@@ -156,13 +159,13 @@ class AppointmentService {
         // Si la BD retornó el catálogo real, forzamos concordancia estricta
         if (catalogArray && catalogArray.length > 0) {
             const sanitizedInput = (service || '').toLowerCase().trim();
-            const serviceFound = catalogArray.find(s => sanitizedInput.includes(s.title.toLowerCase().trim()) ||
+            const serviceFound = catalogArray.find((s) => sanitizedInput.includes(s.title.toLowerCase().trim()) ||
                 s.title.toLowerCase().trim().includes(sanitizedInput));
             // Bloqueamos a la IA si se inventa algo
             if (!serviceFound) {
                 return {
-                    status: "error",
-                    message: `El servicio "${service}" no existe o es irreconocible. Revisa los servicios listados en catálogo y corrige tu solicitud.`
+                    status: 'error',
+                    message: `El servicio "${service}" no existe o es irreconocible. Revisa los servicios listados en catálogo y corrige tu solicitud.`,
                 };
             }
             // Reemplazamos la duración que envió la IA por la real en BD
@@ -173,26 +176,30 @@ class AppointmentService {
         const agendaConfig = ConfigProvider.getConfig().hours;
         const exactStart = DateUtils.createBogotaDate(date, start_time);
         const exactEnd = DateUtils.addMinutes(exactStart, finalDuration);
-        const closingTime = DateUtils.createBogotaDate(date, agendaConfig.close || "17:00");
+        const closingTime = DateUtils.createBogotaDate(date, agendaConfig.close || '17:00');
         const end_time = DateUtils.getBogotaTimeString(exactEnd);
         logger.debug(`Validando: Termina ${end_time} vs Cierre ${agendaConfig.close}`);
         if (exactEnd.getTime() > closingTime.getTime()) {
             return {
-                status: "error",
-                message: `La cita excede el horario de cierre. El estudio cierra a las ${agendaConfig.close}.`
+                status: 'error',
+                message: `La cita excede el horario de cierre. El estudio cierra a las ${agendaConfig.close}.`,
             };
         }
         try {
             // Verificar disponibilidad real usando la duración final
-            const availabilityCheck = await this.checkAvailability({ date, time: start_time, duration_minutes: finalDuration });
-            if (availabilityCheck.status === "error") {
+            const availabilityCheck = await this.checkAvailability({
+                date,
+                time: start_time,
+                duration_minutes: finalDuration,
+            });
+            if (availabilityCheck.status === 'error') {
                 return availabilityCheck;
             }
             // Verificar que el slot específico esté disponible
             if (!availabilityCheck.available_slots.includes(start_time)) {
                 return {
-                    status: "error",
-                    message: "Ese horario específico no está disponible."
+                    status: 'error',
+                    message: 'Ese horario específico no está disponible.',
                 };
             }
             // Crear la cita usando RPC transaccional para asegurar concurrencia sin Race Conditions
@@ -205,47 +212,47 @@ class AppointmentService {
                 p_service_notes: `Agendado por IA. Servicio solicitado: ${finalService}`,
                 p_concurrency_limit: agendaConfig.concurrency,
                 p_buffer_minutes: agendaConfig.buffer,
-                p_closing_time: agendaConfig.close + ':00'
+                p_closing_time: agendaConfig.close + ':00',
             });
             if (error) {
-                logger.error("Error fatal ejecutando RPC guardando cita", { error });
+                logger.error('Error fatal ejecutando RPC guardando cita', { error });
                 return {
-                    status: "error",
-                    message: "Error interno de base de datos impidió agendar la cita."
+                    status: 'error',
+                    message: 'Error interno de base de datos impidió agendar la cita.',
                 };
             }
             // Validar la respuesta del RPC manejada en SQL
             if (rpcResult.status === 'error') {
                 return {
-                    status: "error",
-                    message: rpcResult.message
+                    status: 'error',
+                    message: rpcResult.message,
                 };
             }
             // Notificar al dueño
-            await notificationService.notifyNewAppointment(phone, leadData?.name || "Cliente", {
+            await notificationService.notifyNewAppointment(phone, leadData?.name || 'Cliente', {
                 date,
                 start_time,
                 pet_name,
-                service: finalService
+                service: finalService,
             });
             // Registrar métrica de negocio
-            logger.info("Cita creada", {
-                metric: "cita_creada",
+            logger.info('Cita creada', {
+                metric: 'cita_creada',
                 phone: phone,
                 service: finalService,
                 date: date,
-                time: start_time
+                time: start_time,
             });
             return {
-                status: "success",
-                message: "Cita guardada exitosamente."
+                status: 'success',
+                message: 'Cita guardada exitosamente.',
             };
         }
         catch (error) {
-            logger.error("Error en bookAppointment", { error });
+            logger.error('Error en bookAppointment', { error });
             return {
-                status: "error",
-                message: "Error interno del sistema."
+                status: 'error',
+                message: 'Error interno del sistema.',
             };
         }
     }
@@ -255,14 +262,14 @@ class AppointmentService {
     async cancelAppointment(phone, { date, start_time }) {
         if (!isValidDate(date)) {
             return {
-                status: "error",
-                message: "Fecha inválida (usa YYYY-MM-DD)."
+                status: 'error',
+                message: 'Fecha inválida (usa YYYY-MM-DD).',
             };
         }
         if (!isValidTime(start_time)) {
             return {
-                status: "error",
-                message: "Hora inválida o no proporcionada (usa HH:MM). Es OBLIGATORIO proveer la hora exacta de la cita a cancelar."
+                status: 'error',
+                message: 'Hora inválida o no proporcionada (usa HH:MM). Es OBLIGATORIO proveer la hora exacta de la cita a cancelar.',
             };
         }
         try {
@@ -280,8 +287,8 @@ class AppointmentService {
                 .limit(1);
             if (error || !appointments || appointments.length === 0) {
                 return {
-                    status: "error",
-                    message: "No tienes citas agendadas para esa fecha."
+                    status: 'error',
+                    message: 'No tienes citas agendadas para esa fecha.',
                 };
             }
             const appointment = appointments[0];
@@ -289,36 +296,36 @@ class AppointmentService {
                 .from('appointments')
                 .update({
                 status: 'cancelada',
-                notes: `${appointment.notes || ''} | Cancelada por el usuario via IA.`
+                notes: `${appointment.notes || ''} | Cancelada por el usuario via IA.`,
             })
                 .eq('id', appointment.id);
             if (updateError) {
                 return {
-                    status: "error",
-                    message: "Fallo temporal en la base de datos."
+                    status: 'error',
+                    message: 'Fallo temporal en la base de datos.',
                 };
             }
             // Notificar al dueño
             await notificationService.notifyCancelledAppointment(phone, {
                 date,
-                start_time: appointment.start_time
+                start_time: appointment.start_time,
             });
             // Registrar métrica de negocio
-            logger.info("Cita cancelada", {
-                metric: "cita_cancelada",
+            logger.info('Cita cancelada', {
+                metric: 'cita_cancelada',
                 phone: phone,
-                date: date
+                date: date,
             });
             return {
-                status: "success",
-                message: "¡La cita fue cancelada exitosamente!"
+                status: 'success',
+                message: '¡La cita fue cancelada exitosamente!',
             };
         }
         catch (error) {
-            logger.error("Error en cancelAppointment", { error });
+            logger.error('Error en cancelAppointment', { error });
             return {
-                status: "error",
-                message: "Error interno del sistema."
+                status: 'error',
+                message: 'Error interno del sistema.',
             };
         }
     }

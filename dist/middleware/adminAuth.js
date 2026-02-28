@@ -7,7 +7,7 @@ function adminAuth(req, res, next) {
     if (!apiKey || apiKey !== config.ADMIN_API_KEY) {
         return res.status(401).json({
             status: 'error',
-            message: 'No autorizado. Se requiere un API_KEY válido de Administrador.'
+            message: 'No autorizado. Se requiere un API_KEY válido de Administrador.',
         });
     }
     next();

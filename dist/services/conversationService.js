@@ -44,7 +44,7 @@ class ConversationService {
      */
     async handleHumanIntervention(phone, leadData, message) {
         logger.warn(`Notificando al dueño que el cliente [${leadData.name || phone}] requiere atención manual.`);
-        await notificationService.notifyHumanRequired(phone, leadData.name || "Cliente", message);
+        await notificationService.notifyHumanRequired(phone, leadData.name || 'Cliente', message);
         return { status: 'human_control' };
     }
     /**
@@ -60,10 +60,10 @@ class ConversationService {
             // B. Generar respuesta
             logger.info(`Consultando a Gemini...`);
             const aiResponse = await aiService.generateResponse(model, message, history);
-            let responseText = "";
+            let responseText = '';
             // C. Manejar Function Calls (si existen)
             if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
-                logger.info(`La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map(c => c.name).join(', ')}`);
+                logger.info(`La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map((c) => c.name).join(', ')}`);
                 const result = await aiService.processFunctionCalls(aiResponse.functionCalls, aiResponse.chatSession, phone);
                 responseText = result.text;
                 logger.info(`Herramientas ejecutadas. Respuesta final de IA obtenida.`);
@@ -73,9 +73,9 @@ class ConversationService {
                 responseText = aiResponse.text;
             }
             // Validación de seguridad para evitar enviar mensajes vacíos a WhatsApp
-            if (!responseText || responseText.trim() === "") {
+            if (!responseText || responseText.trim() === '') {
                 logger.warn(`La IA no devolvió texto. Usando respuesta amigable por defecto.`);
-                responseText = "¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾";
+                responseText = '¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾';
             }
             // D. Persistir cambios de la sesión (historial con respuesta IA)
             logger.info(`Actualizando historial de chat con la respuesta de la IA...`);
@@ -92,7 +92,7 @@ class ConversationService {
         }
         catch (error) {
             logger.error(`Error en flujo de IA [${phone}]`, { error });
-            const errorMsg = "Disculpa, tuve un pequeño problema técnico. ¿Podrías repetirme eso?";
+            const errorMsg = 'Disculpa, tuve un pequeño problema técnico. ¿Podrías repetirme eso?';
             await whatsappService.sendMessage(phone, errorMsg);
             return { status: 'error', error: error.message };
         }
@@ -108,7 +108,11 @@ class ConversationService {
         // 3. Registrar en historial como una nota del sistema
         await chatModel.addMessage(phone, {
             role: 'model',
-            parts: [{ text: `[NOTA DEL SISTEMA: UN AGENTE HUMANO INTERVINO Y LE ENVIÓ EL SIGUIENTE MENSAJE AL CLIENTE]: "${message}"` }]
+            parts: [
+                {
+                    text: `[NOTA DEL SISTEMA: UN AGENTE HUMANO INTERVINO Y LE ENVIÓ EL SIGUIENTE MENSAJE AL CLIENTE]: "${message}"`,
+                },
+            ],
         });
         // 4. Notificar actualización
         systemEvents.emit('lead_updated', { phone, type: 'manual_message', bot_active: false });
@@ -120,11 +124,15 @@ class ConversationService {
     async toggleBot(phone, active) {
         if (active) {
             await leadModel.activateBot(phone);
-            const msg = "¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖";
+            const msg = '¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖';
             await whatsappService.sendMessage(phone, msg);
             await chatModel.addMessage(phone, {
                 role: 'model',
-                parts: [{ text: `[NOTA DEL SISTEMA: SE REACTIVÓ A LA IA. EL SISTEMA ENVIÓ ESTE MENSAJE]: "${msg}"` }]
+                parts: [
+                    {
+                        text: `[NOTA DEL SISTEMA: SE REACTIVÓ A LA IA. EL SISTEMA ENVIÓ ESTE MENSAJE]: "${msg}"`,
+                    },
+                ],
             });
         }
         else {

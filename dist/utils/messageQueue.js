@@ -31,7 +31,7 @@ class MessageQueue {
             const timer = setTimeout(() => this.processMessages(from), this.delayMs);
             this.queues.set(from, {
                 messages: [text],
-                timer: timer
+                timer: timer,
             });
         }
     }
@@ -55,7 +55,7 @@ class MessageQueue {
                 await conversationService.handleIncomingMessage(from, combinedText);
             }
             catch (error) {
-                logger.error("Error crítico procesando mensaje desde la cola de concurrencia", { error });
+                logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
             }
         });
     }

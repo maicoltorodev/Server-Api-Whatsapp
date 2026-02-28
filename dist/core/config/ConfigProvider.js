@@ -7,7 +7,7 @@ class ConfigProvider {
     static instance;
     config = null;
     catalog = [];
-    catalogString = "";
+    catalogString = '';
     isInitialized = false;
     constructor() { }
     static getInstance() {
@@ -29,23 +29,28 @@ class ConfigProvider {
      */
     async reload() {
         try {
-            logger.info("[ConfigProvider] Descargando configuración fresca de la Base de Datos...");
+            logger.info('[ConfigProvider] Descargando configuración fresca de la Base de Datos...');
             const [siteRes, aiRes, catalogRes] = await Promise.all([
                 supabase.from('site_content').select('key, value'),
                 supabase.from('ai_settings').select('key, value'),
-                supabase.from('services').select('*')
+                supabase.from('services').select('*'),
             ]);
             // Transform KV to raw Object
             const rawConfig = {};
-            [...(siteRes.data || []), ...(aiRes.data || [])].forEach(item => {
+            [...(siteRes.data || []), ...(aiRes.data || [])].forEach((item) => {
                 const key = item.key.toLowerCase();
                 let value = item.value;
                 // Parse numbers and arrays if possible
                 if (!isNaN(Number(value)) && value.trim() !== '') {
                     value = Number(value);
                 }
-                else if (typeof value === 'string' && value.includes(',') && !isNaN(Number(value.split(',')[0]))) {
-                    value = value.split(',').map(d => Number(d.trim())).filter(n => !isNaN(n));
+                else if (typeof value === 'string' &&
+                    value.includes(',') &&
+                    !isNaN(Number(value.split(',')[0]))) {
+                    value = value
+                        .split(',')
+                        .map((d) => Number(d.trim()))
+                        .filter((n) => !isNaN(n));
                 }
                 rawConfig[key] = value;
             });
@@ -63,8 +68,8 @@ class ConfigProvider {
                     defaultDuration: rawConfig.appointment_duration_minutes,
                 },
                 agent: {
-                    systemInstructions: rawConfig.system_instructions || rawConfig.bot_system_prompt || "",
-                }
+                    systemInstructions: rawConfig.system_instructions || rawConfig.bot_system_prompt || '',
+                },
             };
             // STRICT VALIDATION
             const parsedConfig = types_1.AppConfigSchema.safeParse(mappedConfig);
@@ -79,27 +84,29 @@ class ConfigProvider {
             // Parse Catalog
             if (catalogRes.data) {
                 this.catalog = catalogRes.data
-                    .map(item => {
+                    .map((item) => {
                     const parsed = types_1.CatalogItemSchema.safeParse(item);
                     return parsed.success ? parsed.data : null;
                 })
                     .filter(Boolean);
-                this.catalogString = this.catalog.map(s => `- ${s.title}: (Duración: ${s.duration_minutes} mins) - Precio: ${s.price}`).join('\n');
+                this.catalogString = this.catalog
+                    .map((s) => `- ${s.title}: (Duración: ${s.duration_minutes} mins) - Precio: ${s.price}`)
+                    .join('\n');
             }
             else {
                 this.catalog = [];
-                this.catalogString = "El catálogo está vacío.";
+                this.catalogString = 'El catálogo está vacío.';
             }
             this.isInitialized = true;
-            logger.info("[ConfigProvider] Configuración en RAM cargada exitosamente.");
+            logger.info('[ConfigProvider] Configuración en RAM cargada exitosamente.');
         }
         catch (error) {
-            logger.error("[ConfigProvider] Fallo crítico cargando configuración:", { error });
+            logger.error('[ConfigProvider] Fallo crítico cargando configuración:', { error });
             if (!this.isInitialized) {
                 // Si falla en el primer arranque, inicializa con defaults
                 this.config = types_1.AppConfigSchema.parse({});
                 this.catalog = [];
-                this.catalogString = "Catálogo no disponible.";
+                this.catalogString = 'Catálogo no disponible.';
                 this.isInitialized = true;
             }
         }
@@ -109,7 +116,7 @@ class ConfigProvider {
      */
     getConfig() {
         if (!this.config) {
-            throw new Error("ConfigProvider no ha sido inicializado.");
+            throw new Error('ConfigProvider no ha sido inicializado.');
         }
         return this.config;
     }

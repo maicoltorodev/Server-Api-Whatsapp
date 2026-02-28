@@ -20,11 +20,11 @@ class ToolService {
                 await leadModel.updateStatus(phone, otherData);
             }
             logger.info(`[TOOL] Success: Lead info updated.`);
-            return { status: "ok", message: "Información actualizada correctamente." };
+            return { status: 'ok', message: 'Información actualizada correctamente.' };
         }
         catch (error) {
             logger.error(`[TOOL] Error updating lead info`, { error });
-            return { status: "error", message: error.message };
+            return { status: 'error', message: error.message };
         }
     }
     /**
@@ -68,11 +68,11 @@ class ToolService {
         logger.warn(`[TOOL] EXECUTING: transfer_to_human for ${phone}`);
         const leadData = await leadModel.getByPhone(phone);
         await leadModel.deactivateBot(phone);
-        await notificationService.notifyOwner(phone, leadData?.name || "Cliente", "Solicitud de transferencia a humano");
+        await notificationService.notifyOwner(phone, leadData?.name || 'Cliente', 'Solicitud de transferencia a humano');
         logger.warn(`[TOOL] Bot deactivated. Human notified.`);
         return {
-            status: "transferred",
-            message: "Se ha notificado a un agente humano. El bot ha sido desactivado para este chat."
+            status: 'transferred',
+            message: 'Se ha notificado a un agente humano. El bot ha sido desactivado para este chat.',
         };
     }
     /**
@@ -85,13 +85,13 @@ class ToolService {
             await leadModel.updateMedicalHistory(phone, category, value, pet_name);
             logger.info(`[TOOL] Success: Preference saved in medical_history for pet: ${pet_name}.`);
             return {
-                status: "saved",
-                message: `Dato guardado permanentemente para '${pet_name}' en la categoría '${category}'. Ahora lo recordarás siempre.`
+                status: 'saved',
+                message: `Dato guardado permanentemente para '${pet_name}' en la categoría '${category}'. Ahora lo recordarás siempre.`,
             };
         }
         catch (error) {
             logger.error(`[TOOL] Error saving preference`, { error });
-            return { status: "error", message: "Fallo al guardar el historial médico." };
+            return { status: 'error', message: 'Fallo al guardar el historial médico.' };
         }
     }
 }

@@ -20,16 +20,8 @@ class NotificationService {
             phone: clientPhone,
             name: clientName,
             message: message,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         }));
-    }
-    /**
-     * Envía SMS automatizado al cliente
-     */
-    async sendSMS(to, text) {
-        logger.info(`---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------\nPARA: ${to}\nMENSAJE: ${text}`);
-        // Aquí se integraría con Twilio o servicio de SMS real
-        return true;
     }
     /**
      * Notifica al dueño sobre una nueva cita agendada
@@ -43,7 +35,7 @@ class NotificationService {
      */
     async notifyCancelledAppointment(clientPhone, appointmentData) {
         const message = `⚠️ CITA CANCELADA AUTOMÁTICAMENTE\n🗓️ ${appointmentData.date} a las ${appointmentData.start_time.substring(0, 5)}`;
-        await this.notifyOwner(clientPhone, "Cliente", message);
+        await this.notifyOwner(clientPhone, 'Cliente', message);
     }
     /**
      * Notifica error crítico al dueño
@@ -58,10 +50,10 @@ class NotificationService {
     async notifyClientError(clientPhone) {
         try {
             const whatsappService = require('./whatsappService');
-            await whatsappService.sendMessage(clientPhone, "Disculpa, estoy experimentando un pequeño problema técnico 😵‍💫. Un humano tomará mi lugar en breve para ayudarte.");
+            await whatsappService.sendMessage(clientPhone, 'Disculpa, estoy experimentando un pequeño problema técnico 😵‍💫. Un humano tomará mi lugar en breve para ayudarte.');
         }
         catch (error) {
-            logger.error("Error notificando error al cliente", { error });
+            logger.error('Error notificando error al cliente', { error });
         }
     }
 }

@@ -10,8 +10,8 @@ class WhatsAppService {
     constructor() {
         this.baseUrl = `https://graph.facebook.com/v22.0/${config.PHONE_NUMBER_ID}/messages`;
         this.headers = {
-            'Authorization': `Bearer ${config.WHATSAPP_TOKEN}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${config.WHATSAPP_TOKEN}`,
+            'Content-Type': 'application/json',
         };
     }
     /**
@@ -20,19 +20,19 @@ class WhatsAppService {
     async sendMessage(to, text) {
         try {
             await axios.post(this.baseUrl, {
-                messaging_product: "whatsapp",
+                messaging_product: 'whatsapp',
                 to,
-                type: "text",
-                text: { body: text }
+                type: 'text',
+                text: { body: text },
             }, { headers: this.headers });
             logger.info(`Mensaje enviado a ${to}: ${text.substring(0, 50)}...`);
         }
         catch (error) {
             const errorData = error.response?.data;
-            logger.error("Error enviando mensaje WhatsApp", {
+            logger.error('Error enviando mensaje WhatsApp', {
                 message: error.message,
                 metaError: errorData,
-                stack: error.stack
+                stack: error.stack,
             });
             throw error;
         }
@@ -43,13 +43,15 @@ class WhatsAppService {
     async markAsRead(messageId) {
         try {
             await axios.post(this.baseUrl, {
-                messaging_product: "whatsapp",
-                status: "read",
-                message_id: messageId
+                messaging_product: 'whatsapp',
+                status: 'read',
+                message_id: messageId,
             }, { headers: this.headers });
         }
         catch (error) {
-            logger.error("Error marcando mensaje como leído", { error: error.response?.data || error.message });
+            logger.error('Error marcando mensaje como leído', {
+                error: error.response?.data || error.message,
+            });
             // No lanzamos el error para no interrumpir el flujo principal
         }
     }
@@ -70,7 +72,7 @@ class WhatsAppService {
                 id: message.id,
                 from: message.from,
                 type: message.type,
-                isText: false
+                isText: false,
             };
         }
         return {
@@ -78,15 +80,8 @@ class WhatsAppService {
             from: message.from,
             text: message.text.body,
             type: message.type,
-            isText: true
+            isText: true,
         };
-    }
-    /**
-     * Envía SMS al cliente (stub para Twilio/etc)
-     */
-    async sendSMS(to, text) {
-        logger.info(`---------- ✉️ SMS AUTOMÁTICO AL CLIENTE ----------\nPARA: ${to}\nMENSAJE: ${text}`);
-        return true;
     }
 }
 module.exports = new WhatsAppService();

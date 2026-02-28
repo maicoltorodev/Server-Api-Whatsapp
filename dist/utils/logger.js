@@ -3,34 +3,41 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const winston_1 = __importDefault(require("winston"));
-const logFormat = winston_1.default.format.printf(({ level, message, timestamp, service, ...metadata }) => {
-    let msg = `${level}: ${message}`;
-    if (Object.keys(metadata).length > 0) {
-        // En caso de pasar objetos o errores
-        if (metadata.error) {
-            const err = metadata.error;
-            msg += `\n  Error Stack: ${err.stack || err}`;
-        }
-        else {
-            msg += ` ${JSON.stringify(metadata)}`;
-        }
-    }
-    return msg;
-});
-const logger = winston_1.default.createLogger({
-    level: process.env.LOG_LEVEL || 'info', // Nivel mínimo de log
-    format: winston_1.default.format.combine(winston_1.default.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), winston_1.default.format.errors({ stack: true }), winston_1.default.format.splat(), winston_1.default.format.json(), // Para los archivos
-    logFormat),
-    defaultMeta: { service: 'pet-care-studio-backend' },
-    transports: [
-        // Archivos
-        new winston_1.default.transports.File({ filename: 'logs/error.log', level: 'error' }),
-        new winston_1.default.transports.File({ filename: 'logs/combined.log' }),
-        // Consola (colorizada para desarrollo)
-        new winston_1.default.transports.Console({
-            format: winston_1.default.format.combine(winston_1.default.format.colorize(), logFormat)
-        })
+const pino_1 = __importDefault(require("pino"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+// Asegurar que exista la carpeta logs
+const logDir = path_1.default.join(process.cwd(), 'logs');
+if (!fs_1.default.existsSync(logDir)) {
+    fs_1.default.mkdirSync(logDir, { recursive: true });
+}
+// Configuración de múltiples destinos: Consola bonita + Archivos
+const transport = pino_1.default.transport({
+    targets: [
+        {
+            target: 'pino-pretty',
+            options: {
+                colorize: true,
+                translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+                ignore: 'pid,hostname',
+            },
+            level: 'info',
+        },
+        {
+            target: 'pino/file',
+            options: { destination: path_1.default.join(logDir, 'combined.log'), mkdir: true },
+            level: 'info',
+        },
+        {
+            target: 'pino/file',
+            options: { destination: path_1.default.join(logDir, 'error.log'), mkdir: true },
+            level: 'error',
+        },
     ],
 });
+const logger = (0, pino_1.default)({
+    level: process.env.LOG_LEVEL || 'info',
+    base: { service: 'pet-care-studio-backend' },
+    timestamp: pino_1.default.stdTimeFunctions.isoTime,
+}, transport);
 exports.default = logger;

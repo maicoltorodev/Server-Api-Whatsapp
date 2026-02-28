@@ -24,7 +24,7 @@ class AdminController {
             res.json({ status: 'success', data });
         }
         catch (error) {
-            logger.error("Dashboard Error (getLeads)", { error });
+            logger.error('Dashboard Error (getLeads)', { error });
             res.status(500).json({ status: 'error', message: 'Error obteniendo leads' });
         }
     }
@@ -34,19 +34,27 @@ class AdminController {
     async getChatHistory(req, res) {
         try {
             const { phone } = req.params;
-            const { data: leadData, error: leadError } = await supabase.from('leads').select('*').eq('phone', phone).single();
-            const { data: chatData, error: chatError } = await supabase.from('chats').select('*').eq('phone', phone).single();
+            const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .select('*')
+                .eq('phone', phone)
+                .single();
+            const { data: chatData, error: chatError } = await supabase
+                .from('chats')
+                .select('*')
+                .eq('phone', phone)
+                .single();
             res.json({
                 status: 'success',
                 data: {
                     lead: leadData || null,
                     history: chatData ? chatData.history : [],
-                    last_interaction: chatData ? chatData.updated_at : null
-                }
+                    last_interaction: chatData ? chatData.updated_at : null,
+                },
             });
         }
         catch (error) {
-            logger.error("Dashboard Error (getChatHistory)", { error });
+            logger.error('Dashboard Error (getChatHistory)', { error });
             res.status(500).json({ status: 'error', message: 'Error consultando historial' });
         }
     }
@@ -63,7 +71,7 @@ class AdminController {
             res.json(result);
         }
         catch (error) {
-            logger.error("Dashboard Error (sendManualMessage)", { error });
+            logger.error('Dashboard Error (sendManualMessage)', { error });
             res.status(500).json({ status: 'error', message: 'Error enviando mensaje manual' });
         }
     }
@@ -75,13 +83,15 @@ class AdminController {
             const { phone } = req.params;
             const { active } = req.body;
             if (typeof active !== 'boolean') {
-                return res.status(400).json({ status: 'error', message: '"active" boolean true/false requerido' });
+                return res
+                    .status(400)
+                    .json({ status: 'error', message: '"active" boolean true/false requerido' });
             }
             const result = await conversationService.toggleBot(phone, active);
             res.json(result);
         }
         catch (error) {
-            logger.error("Dashboard Error (toggleBot)", { error });
+            logger.error('Dashboard Error (toggleBot)', { error });
             res.status(500).json({ status: 'error', message: 'Fallo al cambiar estatus del bot' });
         }
     }
@@ -95,7 +105,7 @@ class AdminController {
             res.json({ status: 'success', message: 'Configuración recargada exitosamente en RAM.' });
         }
         catch (error) {
-            logger.error("Dashboard Error (refreshConfig)", { error });
+            logger.error('Dashboard Error (refreshConfig)', { error });
             res.status(500).json({ status: 'error', message: 'Error recargando la configuración' });
         }
     }

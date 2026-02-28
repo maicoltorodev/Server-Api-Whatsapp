@@ -35,7 +35,7 @@ class DateUtils {
      * @param dateStr Formato YYYY-MM-DD
      * @param timeStr Formato HH:mm o HH:mm:ss (Opcional, default 00:00:00)
      */
-    static createBogotaDate(dateStr, timeStr = "00:00:00") {
+    static createBogotaDate(dateStr, timeStr = '00:00:00') {
         const time = timeStr.length === 5 ? `${timeStr}:00` : timeStr.substring(0, 8);
         return new Date(`${dateStr}T${time}-05:00`);
     }
@@ -49,7 +49,7 @@ class DateUtils {
      * Suma minutos a una fecha dada y retorna un nuevo Date absoluto.
      */
     static addMinutes(date, minutes) {
-        return new Date(date.getTime() + (minutes * 60 * 1000));
+        return new Date(date.getTime() + minutes * 60 * 1000);
     }
     /**
      * Devuelve la hora (HH:mm) en formato texto de un Date para la zona horaria de Bogotá.

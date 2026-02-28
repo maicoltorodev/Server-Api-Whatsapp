@@ -9,7 +9,7 @@ const logger = require('../utils/logger').default;
 function verifyMetaSignature(req, res, next) {
     const signature = req.headers['x-hub-signature-256'];
     if (!signature) {
-        logger.warn("Intento de acceso sin firma al Webhook.");
+        logger.warn('Intento de acceso sin firma al Webhook.');
         return res.sendStatus(403);
     }
     const elements = signature.split('=');
@@ -20,11 +20,11 @@ function verifyMetaSignature(req, res, next) {
         .update(req.rawBody)
         .digest('hex');
     if (signatureHash !== expectedHash) {
-        logger.error("FIRMA INVÁLIDA DETECTADA: Spoofing detenido.");
+        logger.error('FIRMA INVÁLIDA DETECTADA: Spoofing detenido.');
         return res.sendStatus(403);
     }
     next();
 }
 module.exports = {
-    verifyMetaSignature
+    verifyMetaSignature,
 };
