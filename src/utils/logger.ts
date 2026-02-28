@@ -1,39 +1,45 @@
-import winston from 'winston';
+import pino from 'pino';
+import fs from 'fs';
+import path from 'path';
 
-const logFormat = winston.format.printf(({ level, message, timestamp, service, ...metadata }) => {
-  let msg = `${level}: ${message}`;
-  if (Object.keys(metadata).length > 0) {
-    // En caso de pasar objetos o errores
-    if (metadata.error) {
-      const err = metadata.error as any;
-      msg += `\n  Error Stack: ${err.stack || err}`;
-    } else {
-      msg += ` ${JSON.stringify(metadata)}`;
-    }
-  }
-  return msg;
-});
+// Asegurar que exista la carpeta logs
+const logDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
 
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info', // Nivel mínimo de log
-  format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
-    winston.format.splat(),
-    winston.format.json(), // Para los archivos
-    logFormat
-  ),
-  defaultMeta: { service: 'pet-care-studio-backend' },
-  transports: [
-    // Archivos
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
-
-    // Consola (colorizada para desarrollo)
-    new winston.transports.Console({
-      format: winston.format.combine(winston.format.colorize(), logFormat),
-    }),
+// Configuración de múltiples destinos: Consola bonita + Archivos
+const transport = pino.transport({
+  targets: [
+    {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+        ignore: 'pid,hostname',
+      },
+      level: 'info',
+    },
+    {
+      target: 'pino/file',
+      options: { destination: path.join(logDir, 'combined.log'), mkdir: true },
+      level: 'info',
+    },
+    {
+      target: 'pino/file',
+      options: { destination: path.join(logDir, 'error.log'), mkdir: true },
+      level: 'error',
+    },
   ],
 });
+
+const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || 'info',
+    base: { service: 'pet-care-studio-backend' },
+    timestamp: pino.stdTimeFunctions.isoTime,
+  },
+  transport
+);
 
 export default logger;
