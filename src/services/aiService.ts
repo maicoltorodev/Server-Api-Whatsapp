@@ -57,7 +57,7 @@ class AIService {
       safetySettings
     });
 
-    logger.info(`[IA] Pre-Prompt Ensamblado: ${systemInstruction.length} caracteres.`);
+    logger.info(`[IA] Pre-Prompt Ensamblado (${systemInstruction.length} caracteres):\n====================\n${systemInstruction}\n====================`);
     return modelObj;
   }
 
@@ -82,13 +82,13 @@ class AIService {
 
     const safeMessage = this._filterSafetyFalsePositives(message);
     const sanitizedHistory = this._sanitizeHistory(history);
-    logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs).`);
+    logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs):\n====================\n${JSON.stringify(sanitizedHistory, null, 2)}\n====================`);
 
     const chatSession = model.startChat({
       history: sanitizedHistory
     });
 
-    logger.info(`[IA] Enviando prompt: "${safeMessage.substring(0, 50)}${safeMessage.length > 50 ? '...' : ''}"`);
+    logger.info(`[IA] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`);
 
     const result = await this._withRetry(async () => {
       return await chatSession.sendMessage(safeMessage);
