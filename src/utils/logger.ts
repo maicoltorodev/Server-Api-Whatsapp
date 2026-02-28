@@ -1,15 +1,14 @@
 import winston from 'winston';
 
-// Formato personalizado para los logs
-const logFormat = winston.format.printf(({ level, message, timestamp, ...metadata }) => {
-    let msg = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+const logFormat = winston.format.printf(({ level, message, timestamp, service, ...metadata }) => {
+    let msg = `${level}: ${message}`;
     if (Object.keys(metadata).length > 0) {
         // En caso de pasar objetos o errores
         if (metadata.error) {
             const err = metadata.error as any;
-            msg += `\nError Stack: ${err.stack || err}`;
+            msg += `\n  Error Stack: ${err.stack || err}`;
         } else {
-            msg += `\nMeta: ${JSON.stringify(metadata, null, 2)}`;
+            msg += ` ${JSON.stringify(metadata)}`;
         }
     }
     return msg;

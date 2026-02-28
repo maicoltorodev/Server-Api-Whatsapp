@@ -61,20 +61,27 @@ class AIService {
     async prepareContext(leadData) {
         return await this.initializeModel(leadData);
     }
+    _filterSafetyFalsePositives(text) {
+        if (!text)
+            return text;
+        // Evita falsos positivos de la API de Gemini (Ej: bloqueos inquebrantables por palabras específicas como "loli")
+        return text.toString().replace(/\b[lL]oli\b/g, "Loly");
+    }
     /**
      * Genera una respuesta manejando el historial de forma segura
      */
     async generateResponse(model, message, history = []) {
         if (!model)
             throw new Error("IA no inicializada.");
+        const safeMessage = this._filterSafetyFalsePositives(message);
         const sanitizedHistory = this._sanitizeHistory(history);
         logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs).`);
         const chatSession = model.startChat({
             history: sanitizedHistory
         });
-        logger.info(`[IA] Enviando prompt: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+        logger.info(`[IA] Enviando prompt: "${safeMessage.substring(0, 50)}${safeMessage.length > 50 ? '...' : ''}"`);
         const result = await this._withRetry(async () => {
-            return await chatSession.sendMessage(message);
+            return await chatSession.sendMessage(safeMessage);
         });
         const usage = result?.response?.usageMetadata;
         if (usage) {
@@ -158,13 +165,18 @@ class AIService {
         // 3. Verificación de alternancia Gemini (user, model, user, model...)
         const alternatingHistory = [];
         for (const msg of finalHistory) {
-            if (alternatingHistory.length > 0 && alternatingHistory[alternatingHistory.length - 1].role === msg.role) {
-                if (msg.role === 'user' && msg.parts && msg.parts[0] && msg.parts[0].text) {
-                    alternatingHistory[alternatingHistory.length - 1].parts[0].text += " " + msg.parts[0].text;
+            let filteredText = "";
+            if (msg.parts && msg.parts[0] && msg.parts[0].text) {
+                filteredText = this._filterSafetyFalsePositives(msg.parts[0].text);
+            }
+            const safeMsg = { ...msg, parts: [{ text: filteredText }] };
+            if (alternatingHistory.length > 0 && alternatingHistory[alternatingHistory.length - 1].role === safeMsg.role) {
+                if (safeMsg.role === 'user') {
+                    alternatingHistory[alternatingHistory.length - 1].parts[0].text += " " + safeMsg.parts[0].text;
                 }
             }
             else {
-                alternatingHistory.push(msg);
+                alternatingHistory.push(safeMsg);
             }
         }
         return alternatingHistory;
