@@ -12,6 +12,7 @@ router.get('/chats/:phone', adminController.getChatHistory); // Trae info de un 
 router.post('/messages/send', adminController.sendManualMessage); // Para que el humano mande mensaje (apaga IA por detrás)
 router.post('/leads/:phone/bot', adminController.toggleBot); // Reactivar o apagar el bot manualmente
 router.post('/config/refresh', adminController.refreshConfig); // Invalida cache de IA/Agenda
+router.post('/reset-all', adminController.resetData); // Danger Zone - Borrado total de leads/chats
 router.get('/events', adminController.streamEvents); // Server-Sent Events (Notificaciones en Vivo)
 
 module.exports = router;

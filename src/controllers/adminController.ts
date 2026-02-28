@@ -144,6 +144,45 @@ class AdminController {
       systemEvents.removeListener('lead_updated', leadListener);
     });
   }
+
+  /**
+   * RESET TOTAL DE DATOS DE PRUEBA (Danger Zone)
+   * Borra Leads, Chats, Citas y Memorias de IA.
+   */
+  async resetData(req, res) {
+    try {
+      logger.warn('INICIANDO RESET TOTAL DE DATOS SOLICITADO POR ADMIN');
+
+      // Ejecutamos eliminaciones secuenciales para evitar bloqueos y problemas de FK
+      logger.info('Borrando Appointments...');
+      await supabase.from('appointments').delete().not('id', 'is', null);
+
+      logger.info('Borrando User Memories...');
+      await supabase.from('user_memories').delete().not('id', 'is', null);
+
+      logger.info('Borrando Chats...');
+      await supabase.from('chats').delete().not('phone', 'is', null);
+
+      logger.info('Borrando Leads...');
+      const { error: leadsError } = await supabase.from('leads').delete().not('id', 'is', null);
+
+      if (leadsError) {
+        logger.error('Error borrando LEADS:', leadsError);
+        throw leadsError;
+      }
+
+      // IMPORTANTE: Refrescar el cache de la IA para que olvide los contextos borrados
+      logger.info('Refrescando caché de IA post-reset');
+      const ConfigProvider = require('../core/config/ConfigProvider').default;
+      await ConfigProvider.reload();
+
+      logger.info('Reset de datos completado exitosamente');
+      res.json({ status: 'success', message: 'Sistema reseteado a cero (Leads, Chats, Citas y Memorias).' });
+    } catch (error: any) {
+      logger.error('Error CRÍTICO en ResetData:', error);
+      res.status(500).json({ status: 'error', message: 'Error crítico al intentar resetear datos. Verifica los logs del servidor.' });
+    }
+  }
 }
 
 module.exports = new AdminController();
