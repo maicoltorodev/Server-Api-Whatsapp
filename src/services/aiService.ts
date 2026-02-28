@@ -190,14 +190,22 @@ class AIService {
     // 3. Verificación de alternancia Gemini (user, model, user, model...)
     const alternatingHistory = [];
     for (const msg of finalHistory) {
-      let filteredText = "";
-      if (msg.parts && msg.parts[0] && msg.parts[0].text) {
-        filteredText = this._filterSafetyFalsePositives(msg.parts[0].text);
+      // Clonar profundamente el mensaje para no mutar el original
+      const safeMsg = JSON.parse(JSON.stringify(msg));
+
+      // Aplicar filtro de falsos positivos SÓLO si es texto 
+      // y respetar function calls / function responses
+      if (safeMsg.parts && Array.isArray(safeMsg.parts)) {
+        safeMsg.parts = safeMsg.parts.map((p: any) => {
+          if (p.text) {
+            p.text = this._filterSafetyFalsePositives(p.text);
+          }
+          return p;
+        });
       }
-      const safeMsg = { ...msg, parts: [{ text: filteredText }] };
 
       if (alternatingHistory.length > 0 && alternatingHistory[alternatingHistory.length - 1].role === safeMsg.role) {
-        if (safeMsg.role === 'user') {
+        if (safeMsg.role === 'user' && safeMsg.parts && safeMsg.parts[0] && safeMsg.parts[0].text) {
           alternatingHistory[alternatingHistory.length - 1].parts[0].text += " " + safeMsg.parts[0].text;
         }
       } else {
