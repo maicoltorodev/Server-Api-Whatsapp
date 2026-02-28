@@ -174,8 +174,10 @@ class AIService {
       sanitized.pop();
     }
 
-    // 2. Limitar tamaño
-    const MAX_HISTORY = 12;
+    // 2. Limitar tamaño (Poda Dinámica de Historial para ahorrar Tokens)
+    // Solo enviamos los últimos 6 mensajes (aprox. 3 idas y vueltas)
+    // La memoria a largo plazo se sostiene vía las actualizaciones en DB y el Prompt System.
+    const MAX_HISTORY = 6;
     if (sanitized.length > MAX_HISTORY) {
       sanitized = sanitized.slice(-MAX_HISTORY);
     }
