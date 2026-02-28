@@ -76,10 +76,7 @@ class ConfigProvider {
                     defaultDuration: rawConfig.appointment_duration_minutes,
                 },
                 agent: {
-                    agentName: rawConfig.agent_name,
-                    agentPersonality: rawConfig.agent_personality,
-                    businessRules: rawConfig.business_rules,
-                    masterPrompt: rawConfig.bot_system_prompt,
+                    systemInstructions: rawConfig.system_instructions || rawConfig.bot_system_prompt || "",
                 }
             };
 

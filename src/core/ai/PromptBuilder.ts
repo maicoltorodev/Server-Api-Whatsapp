@@ -3,14 +3,7 @@ import { IAppConfig } from '../../types';
 export class SystemPromptBuilder {
     private parts: string[] = [];
 
-    /**
-     * Define la identidad base de la IA.
-     */
-    public setIdentity(config: IAppConfig): this {
-        this.parts.push(`Eres "${config.agent.agentName}", la asistente virtual de "${config.siteName}".
-PERSONALIDAD: ${config.agent.agentPersonality}`);
-        return this;
-    }
+
 
     /**
      * Inyecta la hora actual para ubicación temporal.
@@ -85,10 +78,6 @@ ${catalogString}`);
 
         this.parts.push(operationsText);
 
-        if (config.agent.businessRules) {
-            this.parts.push(`REGLAS DE NEGOCIO EN EL ESTUDIO:\n${config.agent.businessRules}`);
-        }
-
         return this;
     }
 
@@ -96,9 +85,8 @@ ${catalogString}`);
      * Las directrices supremas definidas por el dueño en el CMS
      */
     public setMasterInstructions(config: IAppConfig): this {
-        if (config.agent.masterPrompt) {
-            this.parts.push(`INSTRUCCIONES MAESTRAS (OVERRIDE):
-${config.agent.masterPrompt}`);
+        if (config.agent.systemInstructions) {
+            this.parts.push(config.agent.systemInstructions);
         }
         return this;
     }

@@ -62,14 +62,14 @@ class ConversationService {
     try {
       // A. Preparar contexto e historial
       logger.info(`Preparando contexto dinámico (catálogo, etapa, resumen)...`);
-      await aiService.prepareContext(leadData);
+      const model = await aiService.prepareContext(leadData);
 
       const history = await chatModel.getHistory(phone);
       logger.info(`Historial cargado: ${history.length} mensajes previos.`);
 
       // B. Generar respuesta
       logger.info(`Consultando a Gemini...`);
-      const aiResponse = await aiService.generateResponse(message, history);
+      const aiResponse = await aiService.generateResponse(model, message, history);
       let responseText = "";
 
       // C. Manejar Function Calls (si existen)

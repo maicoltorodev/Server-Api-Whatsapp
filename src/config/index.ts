@@ -24,26 +24,10 @@ const config = {
   // Panel Dashboard Admin Config
   ADMIN_API_KEY: process.env.ADMIN_API_KEY || 'super_secret_admin_key_123',
 
-  // Cache Configuration
-  CACHE_TTL: {
-    CATALOG: 30 * 60 * 1000, // 30 minutes
-    AGENDA_CONFIG: 5 * 60 * 1000, // 5 minutes
-    MESSAGE_CACHE: 60 * 60 * 1000 // 1 hour
-  },
-
   // Rate Limiting Configuration
   RATE_LIMIT: {
     WINDOW_MS: 30000, // 30 seconds
     MAX_MESSAGES: 10
-  },
-
-  // Business Configuration
-  BUSINESS_HOURS: {
-    open: "09:00",
-    close: "17:00",
-    buffer: 15, // minutes
-    concurrency: 1,
-    closedDays: [0] // 0 = Sunday
   },
 
   // Timezone

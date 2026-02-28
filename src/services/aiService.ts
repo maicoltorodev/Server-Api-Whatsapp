@@ -6,17 +6,14 @@ const ConfigProvider = require('../core/config/ConfigProvider').default;
 const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
 
 class AIService {
-  model: any;
-
-  constructor() {
-    this.model = null;
-  }
+  constructor() { }
 
   /**
    * Inicializa el modelo usando la memoria RAM (Cero Queries)
+   * Retorna una instancia de modelo configurada para este usuario/contexto.
    */
   async initializeModel(leadData) {
-    logger.info(`[IA] Inicializando modelo Flash (Latest) sincrónicamente...`);
+    logger.info(`[IA] Inicializando instancia de modelo para ${leadData?.phone}...`);
 
     // Obtener configuración inmutable desde RAM
     const appConfig = ConfigProvider.getConfig();
@@ -24,7 +21,6 @@ class AIService {
 
     // Construir el Prompt Maestro Modularmente
     const systemInstruction = new SystemPromptBuilder()
-      .setIdentity(appConfig)
       .setTimeContext(config.TIMEZONE)
       .setLeadContext(leadData?.current_step, leadData?.summary)
       .setMedicalHistory(leadData?.medical_history)
@@ -34,14 +30,14 @@ class AIService {
       .setHardcodedRules()
       .build();
 
-    this.model = genAI.getGenerativeModel({
+    const modelObj = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
       tools: [tools],
       systemInstruction
     });
 
     logger.info(`[IA] Pre-Prompt Ensamblado: ${systemInstruction.length} caracteres.`);
-    logger.info(`[IA] Modelo listo.`);
+    return modelObj;
   }
 
   /**
@@ -54,13 +50,13 @@ class AIService {
   /**
    * Genera una respuesta manejando el historial de forma segura
    */
-  async generateResponse(message, history = []) {
-    if (!this.model) throw new Error("IA no inicializada.");
+  async generateResponse(model, message, history = []) {
+    if (!model) throw new Error("IA no inicializada.");
 
     const sanitizedHistory = this._sanitizeHistory(history);
     logger.info(`[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs).`);
 
-    const chatSession = this.model.startChat({
+    const chatSession = model.startChat({
       history: sanitizedHistory
     });
 

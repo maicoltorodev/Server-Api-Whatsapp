@@ -16,10 +16,7 @@ export const BusinessHoursSchema = z.object({
 });
 
 export const AgentConfigSchema = z.object({
-    agentName: z.string().default('Asistente'),
-    agentPersonality: z.string().default('Amigable, profesional y apasionada por las mascotas.'),
-    businessRules: z.string().default(''),
-    masterPrompt: z.string().default(''),
+    systemInstructions: z.string().default(''),
 });
 
 export const AppConfigSchema = z.object({

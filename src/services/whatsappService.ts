@@ -29,7 +29,12 @@ class WhatsAppService {
 
       logger.info(`Mensaje enviado a ${to}: ${text.substring(0, 50)}...`);
     } catch (error: any) {
-      logger.error("Error enviando mensaje WhatsApp", { error: error.response?.data || error.message });
+      const errorData = error.response?.data;
+      logger.error("Error enviando mensaje WhatsApp", {
+        message: error.message,
+        metaError: errorData,
+        stack: error.stack
+      });
       throw error;
     }
   }
