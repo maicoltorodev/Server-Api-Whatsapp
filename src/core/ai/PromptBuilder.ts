@@ -64,18 +64,23 @@ ${catalogString}`);
     }
 
     /**
-     * Define operaciones logísticas de tiempo y lugar.
+     * Define operaciones logísticas de tiempo y lugar derivado matemáticamente de la BD.
      */
     public setOperations(config: IAppConfig): this {
-        const hoursText = config.hours.business_hours_text || `- Lunes a Sábado: ${config.hours.open} a ${config.hours.close}.`;
-        const closedText = config.hours.closed_days_text ? `\nDÍAS CERRADOS:\n${config.hours.closed_days_text}` : '\n- Domingos: Cerrado.';
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const closedDaysNames = config.hours.closedDays.map(d => diasSemana[d]).join(', ');
 
-        this.parts.push(`HORARIOS DE ATENCIÓN:
-${hoursText}${closedText}`);
+        // Convertimos las matemáticas puras de la base de datos en español natural para la IA
+        let operationsText = `HORARIOS DE ATENCIÓN:\n- Abierto de ${config.hours.open} a ${config.hours.close}.`;
+
+        if (config.hours.closedDays.length > 0) {
+            operationsText += `\n\nDÍAS CERRADOS (PROHIBIDO AGENDAR ESTOS DÍAS):\n- ${closedDaysNames}.`;
+        }
+
+        this.parts.push(operationsText);
 
         if (config.agent.businessRules) {
-            this.parts.push(`REGLAS DE NEGOCIO EN EL ESTUDIO:
-${config.agent.businessRules}`);
+            this.parts.push(`REGLAS DE NEGOCIO EN EL ESTUDIO:\n${config.agent.businessRules}`);
         }
 
         return this;
