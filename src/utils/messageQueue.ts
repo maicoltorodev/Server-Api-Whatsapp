@@ -59,7 +59,7 @@ class MessageQueue {
     );
 
     // 3. Ahora sí, lo encolamos en el embudo asíncrono seguro (Protegiendo el servidor de ráfagas)
-    const concurrencyQueue = require('./ConcurrencyQueue').default;
+    const concurrencyQueue = require('./ConcurrencyQueue');
 
     concurrencyQueue.enqueue(async () => {
       try {

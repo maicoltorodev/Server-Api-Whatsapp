@@ -19,6 +19,7 @@ const config = {
     SUPABASE_KEY: process.env.SUPABASE_KEY,
     // Panel Dashboard Admin Config
     ADMIN_API_KEY: process.env.ADMIN_API_KEY || 'super_secret_admin_key_123',
+    FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
     // Rate Limiting Configuration
     RATE_LIMIT: {
         WINDOW_MS: 30000, // 30 seconds

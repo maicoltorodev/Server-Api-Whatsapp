@@ -10,7 +10,8 @@ const ConfigProvider = require('./core/config/ConfigProvider').default;
 const app = express();
 
 // Middleware básico
-app.use(cors()); // Habilita peticiones cruzadas para el Dashboard (React/Vue/Angular)
+// Habilita peticiones cruzadas solo para el Dashboard autorizado
+app.use(cors({ origin: config.FRONTEND_URL }));
 app.use(
   express.json({
     verify: (req, res, buf) => {
@@ -22,6 +23,12 @@ app.use(
 app.use('/', healthRoutes);
 app.use('/webhook', webhookRoutes);
 app.use('/api/admin', adminRoutes);
+
+// Error Handler Global de Express (Captura errores sincrónicos/asincrónicos no detectados en rutas)
+app.use((err: any, req: any, res: any, next: any) => {
+  logger.error('Error no controlado en la aplicación HTTP:', { error: err.stack || err });
+  res.status(500).json({ status: 'error', message: 'Error interno inesperado en el servidor.' });
+});
 
 // Iniciar servidor encapsulando en init para cargar configuración en RAM preventiva
 const startServer = async () => {
@@ -58,6 +65,16 @@ const startServer = async () => {
 
 startServer().catch((err: any) => {
   logger.error('Error fatal inicializando la configuración:', { error: err });
+  process.exit(1);
+});
+
+// Captura global de promesas no manejadas y excepciones fatales para no apagar Node.js silenciosamente
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection detectado', { promise, reason });
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal('Uncaught Exception detectada, cerrando el proceso de forma segura...', { error: err });
   process.exit(1);
 });
 

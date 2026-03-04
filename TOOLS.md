@@ -27,5 +27,5 @@ Las IAs que asistan en el desarrollo y mantenimiento del código deben leer este
 
 ## 6. `save_pet_preference` (Historial Médico)
 - **Propósito:** Almacén persistente (Long-Term Memory). Permite recordar permanentemente condiciones de salud, historial o exigencias de los dueños. 
-- **Payload esperado:** `{ category: "allergies", value: "Alergia a shampoo de fresa" }`
+- **Payload esperado:** `{ pet_name: "Luna", category: "allergies", value: "Alergia a shampoo de fresa" }`
 - **Comportamiento:** Modifica silenciosamente el JSONB en la base de datos para que la próxima cita de esta mascota inyecte este contexto.

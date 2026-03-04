@@ -23,6 +23,7 @@ const config = {
 
   // Panel Dashboard Admin Config
   ADMIN_API_KEY: process.env.ADMIN_API_KEY || 'super_secret_admin_key_123',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
 
   // Rate Limiting Configuration
   RATE_LIMIT: {

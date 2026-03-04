@@ -49,7 +49,7 @@ class MessageQueue {
         const combinedText = userQueue.messages.join('. ');
         logger.info(`[BLOQUE COMBINADO LISTO] -> Enviando a IA\nUsuario: ${from}\nUnificado (${userQueue.messages.length} envíos en 1): "${combinedText}"`);
         // 3. Ahora sí, lo encolamos en el embudo asíncrono seguro (Protegiendo el servidor de ráfagas)
-        const concurrencyQueue = require('./ConcurrencyQueue').default;
+        const concurrencyQueue = require('./ConcurrencyQueue');
         concurrencyQueue.enqueue(async () => {
             try {
                 await conversationService.handleIncomingMessage(from, combinedText);

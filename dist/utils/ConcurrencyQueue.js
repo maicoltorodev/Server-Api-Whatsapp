@@ -64,4 +64,4 @@ class ConcurrencyQueue {
         });
     }
 }
-exports.default = new ConcurrencyQueue(3); // Solo permitimos 3 chats con IA procesándose al mismo tiempo
+module.exports = new ConcurrencyQueue(3); // Solo permitimos 3 chats con IA procesándose al mismo tiempo
