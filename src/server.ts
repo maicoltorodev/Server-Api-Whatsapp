@@ -33,6 +33,11 @@ app.use((err: any, req: any, res: any, next: any) => {
 // Iniciar servidor encapsulando en init para cargar configuración en RAM preventiva
 const startServer = async () => {
   await ConfigProvider.init();
+
+  // Iniciar servicio de mantenimiento automático
+  const maintenanceService = require('./services/maintenanceService');
+  maintenanceService.init();
+
   const server = app.listen(config.PORT, () => {
     // REINICIO FORZADO POR ANTIGRAVITY
     logger.info(`SERVIDOR ENTERPRISE ACTIVO - Puerto: ${config.PORT}`);

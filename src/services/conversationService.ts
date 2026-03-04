@@ -99,10 +99,9 @@ class ConversationService {
         responseText = '¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾';
       }
 
-      // D. Persistir cambios de la sesión (historial con respuesta IA)
-      logger.info(`Actualizando historial de chat con la respuesta de la IA...`);
-      const updatedHistory = await aiResponse.chatSession.getHistory();
-      await chatModel.saveHistory(phone, updatedHistory);
+      // D. Persistir respuesta de la IA en el historial (de forma incremental)
+      logger.info(`Guardando la respuesta de la IA en el historial...`);
+      await chatModel.addMessage(phone, { role: 'model', parts: [{ text: responseText }] });
 
       // E. Enviar al cliente
       logger.info(`Enviando respuesta a WhatsApp...`);
@@ -154,16 +153,6 @@ class ConversationService {
   async toggleBot(phone: string, active: boolean) {
     if (active) {
       await leadModel.activateBot(phone);
-      const msg = '¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖';
-      await whatsappService.sendMessage(phone, msg);
-      await chatModel.addMessage(phone, {
-        role: 'model',
-        parts: [
-          {
-            text: `[NOTA DEL SISTEMA: SE REACTIVÓ A LA IA. EL SISTEMA ENVIÓ ESTE MENSAJE]: "${msg}"`,
-          },
-        ],
-      });
     } else {
       await leadModel.deactivateBot(phone);
     }

@@ -147,7 +147,7 @@ class AppointmentService {
   async bookAppointment(
     phone,
     leadData,
-    { service, pet_name, date, start_time, duration_minutes }
+    { customer_name, service, pet_name, date, start_time, duration_minutes }
   ) {
     // Validaciones
     if (!isValidDate(date) || !isValidTime(start_time)) {
@@ -162,6 +162,14 @@ class AppointmentService {
         status: 'error',
         message:
           'Nombre de la mascota no proporcionado. Debes preguntar y registrar el nombre exacto de la mascota.',
+      };
+    }
+
+    if (!customer_name || customer_name.trim() === '') {
+      return {
+        status: 'error',
+        message:
+          'Nombre del cliente no proporcionado. Es obligatorio preguntar el nombre de la persona para agendar.',
       };
     }
 
@@ -285,6 +293,11 @@ class AppointmentService {
           status: 'error',
           message: rpcResult.message,
         };
+      }
+
+      // Actualizar el nombre del Lead en la BD si es necesario
+      if (customer_name && customer_name !== leadData?.name) {
+        await supabase.from('leads').update({ name: customer_name }).eq('phone', phone);
       }
 
       // Notificar al dueño

@@ -7,7 +7,7 @@ const ConfigProvider = require('../core/config/ConfigProvider').default;
 const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
 
 class AIService {
-  constructor() {}
+  constructor() { }
 
   /**
    * Inicializa el modelo usando la memoria RAM (Cero Queries)
@@ -23,7 +23,7 @@ class AIService {
     // Construir el Prompt Maestro Modularmente
     const systemInstruction = new SystemPromptBuilder()
       .setTimeContext(config.TIMEZONE)
-      .setLeadContext(leadData?.current_step, leadData?.summary)
+      .setLeadContext(leadData?.name, leadData?.current_step, leadData?.summary)
       .setMedicalHistory(leadData?.medical_history)
       .setCatalog(catalogString)
       .setOperations(appConfig)
@@ -68,6 +68,18 @@ class AIService {
    */
   async prepareContext(leadData) {
     return await this.initializeModel(leadData);
+  }
+
+  _cleanupModelResponse(text) {
+    if (!text) return text;
+    // 1. Eliminar cualquier línea que empiece con "引导:" o "Guidance:" o "Thought:" etc.
+    // 2. Eliminar cualquier rastro de llamadas a funciones en texto plano (ej: update_lead_info(...))
+    return text
+      .toString()
+      .replace(/^(引导|Guidance|Thought|Reflexión|Analísis|Pensamiento):.*$/gim, '')
+      .replace(/^[a-z_]+\(.*\)$/gm, '') // Elimina líneas que parecen llamadas a funciones
+      .replace(/```[a-z]*[\s\S]*?```/g, '') // Elimina bloques de código accidentales
+      .trim();
   }
 
   _filterSafetyFalsePositives(text) {
@@ -116,7 +128,7 @@ class AIService {
 
     return {
       functionCalls: calls,
-      text: result.response.text(),
+      text: this._cleanupModelResponse(result.response.text()),
       chatSession,
     };
   }
@@ -165,7 +177,7 @@ class AIService {
         );
       }
 
-      finalResponse.text = result.response.text();
+      finalResponse.text = this._cleanupModelResponse(result.response.text());
       currentCalls = result.response.functionCalls();
 
       if (currentCalls && currentCalls.length > 0) {

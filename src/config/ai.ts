@@ -12,7 +12,10 @@ const tools = {
       parameters: {
         type: 'OBJECT',
         properties: {
-          name: { type: 'STRING' },
+          name: {
+            type: 'STRING',
+            description: 'Nombre REAL del humano (persona). PROHIBIDO usar el nombre de la mascota aquí. PROHIBIDO usar "Cliente de [Mascota]".'
+          },
           product_service: { type: 'STRING' },
           appointment_date: { type: 'STRING' },
           budget: { type: 'STRING' },
@@ -51,6 +54,10 @@ const tools = {
       parameters: {
         type: 'OBJECT',
         properties: {
+          customer_name: {
+            type: 'STRING',
+            description: 'Nombre REAL y apellido de la PERSONA (Humano). PROHIBIDO usar el nombre de la mascota o "Cliente de [Mascota]".',
+          },
           service: { type: 'STRING', description: 'El servicio a agendar (ej. Baño, Peluquería)' },
           pet_name: {
             type: 'STRING',
@@ -64,7 +71,7 @@ const tools = {
             description: 'Duración en minutos según el catálogo.',
           },
         },
-        required: ['service', 'pet_name', 'date', 'start_time', 'duration_minutes'],
+        required: ['customer_name', 'service', 'pet_name', 'date', 'start_time', 'duration_minutes'],
       },
     },
     {

@@ -53,8 +53,8 @@ class ChatModel {
     const history = await this.getHistory(phone);
     history.push(message);
 
-    // Limitamos el historial a los últimos 20 mensajes para no sobrecargar
-    const limitedHistory = history.slice(-20);
+    // Limitamos el historial a los últimos 30 mensajes para no sobrecargar el CRM ni la BD
+    const limitedHistory = history.slice(-30);
 
     return await this.saveHistory(phone, limitedHistory);
   }
