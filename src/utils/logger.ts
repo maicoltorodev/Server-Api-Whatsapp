@@ -1,93 +1,93 @@
-import pino from 'pino';
-import fs from 'fs';
-import path from 'path';
+/**
+ * Simple Logger (Native Console)
+ * Logs nativos con colores, iconos y formato claro sin dependencias (ANSI).
+ */
 
-// Asegurar que exista la carpeta logs
-const logDir = path.join(process.cwd(), 'logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
-}
+const colors = {
+  reset: "\x1b[0m",
+  info: "\x1b[36m",   // Cyan
+  success: "\x1b[32m", // Verde
+  warn: "\x1b[33m",   // Amarillo
+  error: "\x1b[31m",  // Rojo
+  debug: "\x1b[35m",  // Magenta
+  fatal: "\x1b[41m\x1b[37m", // Fondo rojo, texto blanco
+  gray: "\x1b[90m",   // Gris
+  bold: "\x1b[1m"     // Negrita
+};
 
-// Configuración configurable por entorno
-const isDevelopment = process.env.NODE_ENV === 'development';
-const isProduction = process.env.NODE_ENV === 'production';
-const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
+const icons = {
+  info: "🔹",
+  success: "✅",
+  warn: "⚠️",
+  error: "❌",
+  debug: "🐛",
+  fatal: "💀",
+};
 
-const getConsoleTransport = () => {
-  if (isDevelopment) {
-    return {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'SYS:HH:MM:ss',
-        ignore: 'pid,hostname',
-      },
-      level: 'debug',
-    };
+// Genera el reloj para la línea del log
+const getTimestamp = () => {
+  const now = new Date();
+  const timeInfo = now.toISOString().split('T')[1].split('.')[0]; // Solo tomar HH:MM:SS
+  return `${colors.gray}[${timeInfo}]${colors.reset}`;
+};
+
+// Limpia el objeto si viene como data (evita un [object Object])
+const formatearData = (data?: any) => {
+  if (!data) return '';
+  // Si la `data` tiene un error en formato JSON, imprimimos el stack completo
+  if (data instanceof Error || data?.error instanceof Error) {
+    return `\n${colors.gray}${data.stack || data.error?.stack}${colors.reset}`;
   }
-  // En producción (Railway), usar salida estándar limpia para evitar caídas por dependencias dev
+  return `\n  ${colors.gray}↳ ${JSON.stringify(data, null, 2)}${colors.reset}`;
+};
+
+const formatMessage = (level: keyof typeof colors, icon: string, msg: string, component?: string) => {
+  const prefix = component ? `${colors.bold}${colors.debug}[${component}]${colors.reset} ` : '';
+  const color = colors[level] || colors.reset;
+  return `${getTimestamp()} ${icon} ${prefix}${color}${msg}${colors.reset}`;
+};
+
+const createLogger = (component?: string) => {
   return {
-    target: 'pino/file', // Imprime a process.stdout por defecto si no hay destination
-    options: { destination: 1 },
-    level: 'info',
+    level: 'info', // Propiedad dummy para mantener compatibilidad
+
+    info: (msg: string, data?: any) => {
+      console.log(formatMessage('info', icons.info, msg, component) + formatearData(data));
+    },
+
+    success: (msg: string, data?: any) => {
+      console.log(formatMessage('success', icons.success, msg, component) + formatearData(data));
+    },
+
+    error: (msg: string, data?: any) => {
+      console.error(formatMessage('error', icons.error, msg, component) + formatearData(data));
+    },
+
+    warn: (msg: string, data?: any) => {
+      console.warn(formatMessage('warn', icons.warn, msg, component) + formatearData(data));
+    },
+
+    debug: (msg: string, data?: any) => {
+      console.debug(formatMessage('debug', icons.debug, msg, component) + formatearData(data));
+    },
+
+    fatal: (msg: string, data?: any) => {
+      console.error(formatMessage('fatal', icons.fatal, `[FATAL RUNTIME] ${msg}`, component) + formatearData(data));
+    },
+
+    child: (options: { component?: string }) => createLogger(options.component)
   };
 };
 
-const transport = pino.transport({
-  targets: [
-    getConsoleTransport() as any,
-    {
-      target: 'pino/file',
-      options: {
-        destination: path.join(logDir, 'combined.log'),
-        mkdir: true,
-        append: true
-      },
-      level: 'info',
-    },
-    {
-      target: 'pino/file',
-      options: {
-        destination: path.join(logDir, 'error.log'),
-        mkdir: true,
-        append: true
-      },
-      level: 'error',
-    },
-  ],
-});
+const logger = createLogger();
 
-const logger = pino(
-  {
-    level: logLevel,
-    base: {
-      service: 'pet-care-studio-backend',
-      version: process.env.npm_package_version || '1.0.0',
-      environment: process.env.NODE_ENV || 'development'
-    },
-    timestamp: pino.stdTimeFunctions.isoTime,
-    // En producción, reducir verbosidad para performance
-    formatters: isProduction ? {
-      level: (label) => ({ level: label }),
-      log: (object) => {
-        // Eliminar campos verbose en producción
-        const { hostname, pid, ...cleaned } = object;
-        return cleaned;
-      }
-    } : undefined
-  },
-  transport
-);
+// Loggers específicos requeridos por la aplicación
+export const performanceLogger = createLogger('performance');
 
-// Logger específico para performance (menos verboso)
-export const performanceLogger = logger.child({ component: 'performance' });
-
-// Logger específico para seguridad (siempre a nivel warn)
-export const securityLogger = logger.child({ component: 'security' });
+export const securityLogger = createLogger('security');
 securityLogger.level = 'warn';
 
-// Logger específico para auditoría (siempre info)
-export const auditLogger = logger.child({ component: 'audit' });
+export const auditLogger = createLogger('audit');
 auditLogger.level = 'info';
 
 export default logger;
