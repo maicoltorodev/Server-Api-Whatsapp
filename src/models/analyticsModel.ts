@@ -7,7 +7,7 @@ class AnalyticsModel {
      */
     async getGlobalStats() {
         try {
-            // 1. Total de leads con intención (más de 1 mensaje)
+            // 1. Total de leads con intención
             const { data: leads, error: leadsError } = await supabase.from('leads').select('status, phone');
             if (leadsError) throw leadsError;
 
@@ -65,22 +65,25 @@ class AnalyticsModel {
     }
 
     /**
-     * Obtiene el mapa de calor horario basado en mensajes
+     * Obtiene el mapa de calor horario basado en la última actividad de los chats
      */
     async getHeatmapData() {
         try {
+            // Usamos updated_at ya que la tabla chats no tiene created_at (es un log de actividad reciente)
             const { data, error } = await supabase
                 .from('chats')
-                .select('created_at')
-                .order('created_at', { ascending: false })
+                .select('updated_at')
+                .order('updated_at', { ascending: false })
                 .limit(1000);
 
             if (error) throw error;
 
             const hours = Array(24).fill(0).map((_, i) => ({ hour: `${i}:00`, mjes: 0 }));
             (data || []).forEach(c => {
-                const hour = new Date(c.created_at).getHours();
-                hours[hour].mjes++;
+                if (c.updated_at) {
+                    const hour = new Date(c.updated_at).getHours();
+                    hours[hour].mjes++;
+                }
             });
 
             return hours;
@@ -100,19 +103,18 @@ class AnalyticsModel {
 
             const breeds = {};
             (data || []).forEach(l => {
-                const pets = l.medical_history?.pets || [];
+                const history = l.medical_history || {};
+                const pets = history.pets || [];
                 pets.forEach(p => {
                     const breed = p.breed || 'Desconocida';
                     breeds[breed] = (breeds[breed] || 0) + 1;
                 });
             });
 
-            const result = Object.entries(breeds)
+            return Object.entries(breeds)
                 .map(([name, value]) => ({ name, value }))
                 .sort((a, b) => (b.value as number) - (a.value as number))
                 .slice(0, 5);
-
-            return result;
         } catch (error) {
             logger.error('Error en AnalyticsModel.getPetDemographics', { error });
             throw error;
@@ -120,20 +122,27 @@ class AnalyticsModel {
     }
 
     /**
-     * Obtiene eficiencia de la IA
+     * Obtiene eficiencia de la IA analizando el historial JSONB
      */
     async getIAEfficiency() {
         try {
             const { data, error } = await supabase
                 .from('chats')
-                .select('from_me, phone')
-                .order('created_at', { ascending: false })
-                .limit(2000);
+                .select('history');
 
             if (error) throw error;
 
-            const botMessages = (data || []).filter(m => m.from_me).length;
-            const totalMessages = data?.length || 0;
+            let botMessages = 0;
+            let totalMessages = 0;
+
+            (data || []).forEach(chat => {
+                const history = chat.history || [];
+                history.forEach(msg => {
+                    totalMessages++;
+                    if (msg.role === 'model') botMessages++;
+                });
+            });
+
             const automationRatio = totalMessages > 0 ? (botMessages / totalMessages) * 100 : 0;
 
             return {
