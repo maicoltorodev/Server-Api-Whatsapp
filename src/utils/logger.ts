@@ -13,24 +13,33 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
 const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
 
-// Configuración de múltiples destinos: Consola bonita + Archivos
-const transport = pino.transport({
-  targets: [
-    {
+const getConsoleTransport = () => {
+  if (isDevelopment) {
+    return {
       target: 'pino-pretty',
       options: {
-        colorize: isDevelopment,
-        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+        colorize: true,
+        translateTime: 'SYS:HH:MM:ss',
         ignore: 'pid,hostname',
-        levelFirst: isDevelopment,
-        messageFormat: isDevelopment ? '{service} [{level}] {msg}' : '{service} [{level}] {msg}',
       },
-      level: isDevelopment ? 'debug' : 'info',
-    },
+      level: 'debug',
+    };
+  }
+  // En producción (Railway), usar salida estándar limpia para evitar caídas por dependencias dev
+  return {
+    target: 'pino/file', // Imprime a process.stdout por defecto si no hay destination
+    options: { destination: 1 },
+    level: 'info',
+  };
+};
+
+const transport = pino.transport({
+  targets: [
+    getConsoleTransport() as any,
     {
       target: 'pino/file',
-      options: { 
-        destination: path.join(logDir, 'combined.log'), 
+      options: {
+        destination: path.join(logDir, 'combined.log'),
         mkdir: true,
         append: true
       },
@@ -38,8 +47,8 @@ const transport = pino.transport({
     },
     {
       target: 'pino/file',
-      options: { 
-        destination: path.join(logDir, 'error.log'), 
+      options: {
+        destination: path.join(logDir, 'error.log'),
         mkdir: true,
         append: true
       },
@@ -51,7 +60,7 @@ const transport = pino.transport({
 const logger = pino(
   {
     level: logLevel,
-    base: { 
+    base: {
       service: 'pet-care-studio-backend',
       version: process.env.npm_package_version || '1.0.0',
       environment: process.env.NODE_ENV || 'development'
