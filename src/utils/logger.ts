@@ -24,10 +24,16 @@ const icons = {
   fatal: "💀",
 };
 
-// Genera el reloj para la línea del log
+// Genera el reloj exacto en hora de Bogotá nativo de JS
 const getTimestamp = () => {
   const now = new Date();
-  const timeInfo = now.toISOString().split('T')[1].split('.')[0]; // Solo tomar HH:MM:SS
+  const timeInfo = new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(now);
   return `${colors.gray}[${timeInfo}]${colors.reset}`;
 };
 

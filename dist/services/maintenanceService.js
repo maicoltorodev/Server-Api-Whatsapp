@@ -81,17 +81,37 @@ class MaintenanceService {
         this.scheduleNextRun();
     }
     scheduleNextRun() {
-        // Obtenemos la fecha/hora actual en Bogotá
         const now = new Date();
-        const nowBogota = new Date(now.getTime() - (5 * 60 * 60 * 1000)); // Ajuste manual simple para logica de espera
-        // Creamos el objeto para mañana a las 00:00:01
-        const tomorrow = new Date(now);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(0, 0, 1, 0); // 00:00:01 AM
-        // Calculamos la espera en ms
-        const msUntilMidnight = tomorrow.getTime() - now.getTime();
-        const hours = Math.floor(msUntilMidnight / (1000 * 60 * 60));
-        const minutes = Math.floor((msUntilMidnight % (1000 * 60 * 60)) / (1000 * 60));
+        // Obtenemos la hora exacta en Bogotá de forma nativa e infalible
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Bogota',
+            hour: 'numeric', minute: 'numeric', second: 'numeric',
+            hour12: false, // Forzar 24hs
+        });
+        // formatter.format() retorna "14:16:51" o similar. Dependiendo de NodeJS, podría imprimir "24:xx" 
+        const timeStr = formatter.format(now);
+        // Si Node retorna PM/AM a la fuerza (por en-US error en ciertas versiones), obligamos los 2 dígitos
+        const timeParts = timeStr.match(/\d+/g);
+        if (!timeParts || timeParts.length < 3) {
+            logger.error("Error analizando huso horario. Programando fallback en 1 hora.");
+            setTimeout(() => this.scheduleNextRun(), 3600000);
+            return;
+        }
+        let bHour = parseInt(timeParts[0], 10);
+        if (bHour === 24)
+            bHour = 0; // Algunas versiones de Node retornan 24 para medianoche
+        if (timeStr.toLowerCase().includes('pm') && bHour < 12)
+            bHour += 12;
+        if (timeStr.toLowerCase().includes('am') && bHour === 12)
+            bHour = 0;
+        const bMinute = parseInt(timeParts[1], 10);
+        const bSecond = parseInt(timeParts[2], 10);
+        // Milisegundos que han pasado hoy en Bogotá desde su medianoche
+        const msSinceMidnight = (bHour * 3600000) + (bMinute * 60000) + (bSecond * 1000);
+        // Milisegundos que faltan para llegar a la próxima medianoche en Bogotá (sumamos 1 segundo extra)
+        const msUntilMidnight = (24 * 3600000) - msSinceMidnight + 1000;
+        const hours = Math.floor(msUntilMidnight / 3600000);
+        const minutes = Math.floor((msUntilMidnight % 3600000) / 60000);
         logger.info(`Próximo mantenimiento programado en ${hours}h ${minutes}m (Medianoche Bogotá)`);
         setTimeout(() => {
             this.runDailyMaintenance();
