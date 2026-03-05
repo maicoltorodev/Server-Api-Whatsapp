@@ -70,10 +70,10 @@ export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): T {
         code: err.code,
       }));
 
-      securityLogger.warn({
+      securityLogger.warn('Input validation failed', {
         errors: errorDetails,
         input: data,
-      }, 'Input validation failed');
+      });
 
       throw new ValidationError('Invalid input data', errorDetails);
     }
@@ -157,12 +157,12 @@ export function checkRateLimit(
   }
 
   if (entry.count >= maxRequests) {
-    securityLogger.warn({
+    securityLogger.warn('Rate limit exceeded', {
       identifier,
       count: entry.count,
       maxRequests,
       windowMs,
-    }, 'Rate limit exceeded');
+    });
     return false;
   }
 

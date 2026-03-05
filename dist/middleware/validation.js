@@ -71,10 +71,10 @@ function validateInput(schema, data) {
                 message: err.message,
                 code: err.code,
             }));
-            logger_1.securityLogger.warn({
+            logger_1.securityLogger.warn('Input validation failed', {
                 errors: errorDetails,
                 input: data,
-            }, 'Input validation failed');
+            });
             throw new ValidationError('Invalid input data', errorDetails);
         }
         throw error;
@@ -129,12 +129,12 @@ function checkRateLimit(identifier, maxRequests = 10, windowMs = 60000 // 1 minu
         return true;
     }
     if (entry.count >= maxRequests) {
-        logger_1.securityLogger.warn({
+        logger_1.securityLogger.warn('Rate limit exceeded', {
             identifier,
             count: entry.count,
             maxRequests,
             windowMs,
-        }, 'Rate limit exceeded');
+        });
         return false;
     }
     entry.count++;

@@ -1,87 +1,79 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+/**
+ * Simple Logger (Native Console)
+ * Logs nativos con colores, iconos y formato claro sin dependencias (ANSI).
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.auditLogger = exports.securityLogger = exports.performanceLogger = void 0;
-const pino_1 = __importDefault(require("pino"));
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
-// Asegurar que exista la carpeta logs
-const logDir = path_1.default.join(process.cwd(), 'logs');
-if (!fs_1.default.existsSync(logDir)) {
-    fs_1.default.mkdirSync(logDir, { recursive: true });
-}
-// Configuración configurable por entorno
-const isDevelopment = process.env.NODE_ENV === 'development';
-const isProduction = process.env.NODE_ENV === 'production';
-const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
-const getConsoleTransport = () => {
-    if (isDevelopment) {
-        return {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                translateTime: 'SYS:HH:MM:ss',
-                ignore: 'pid,hostname',
-            },
-            level: 'debug',
-        };
+const colors = {
+    reset: "\x1b[0m",
+    info: "\x1b[36m", // Cyan
+    success: "\x1b[32m", // Verde
+    warn: "\x1b[33m", // Amarillo
+    error: "\x1b[31m", // Rojo
+    debug: "\x1b[35m", // Magenta
+    fatal: "\x1b[41m\x1b[37m", // Fondo rojo, texto blanco
+    gray: "\x1b[90m", // Gris
+    bold: "\x1b[1m" // Negrita
+};
+const icons = {
+    info: "🔹",
+    success: "✅",
+    warn: "⚠️",
+    error: "❌",
+    debug: "🐛",
+    fatal: "💀",
+};
+// Genera el reloj para la línea del log
+const getTimestamp = () => {
+    const now = new Date();
+    const timeInfo = now.toISOString().split('T')[1].split('.')[0]; // Solo tomar HH:MM:SS
+    return `${colors.gray}[${timeInfo}]${colors.reset}`;
+};
+// Limpia el objeto si viene como data (evita un [object Object])
+const formatearData = (data) => {
+    if (!data)
+        return '';
+    // Si la `data` tiene un error en formato JSON, imprimimos el stack completo
+    if (data instanceof Error || data?.error instanceof Error) {
+        return `\n${colors.gray}${data.stack || data.error?.stack}${colors.reset}`;
     }
-    // En producción (Railway), usar salida estándar limpia para evitar caídas por dependencias dev
+    return `\n  ${colors.gray}↳ ${JSON.stringify(data, null, 2)}${colors.reset}`;
+};
+const formatMessage = (level, icon, msg, component) => {
+    const prefix = component ? `${colors.bold}${colors.debug}[${component}]${colors.reset} ` : '';
+    const color = colors[level] || colors.reset;
+    return `${getTimestamp()} ${icon} ${prefix}${color}${msg}${colors.reset}`;
+};
+const createLogger = (component) => {
     return {
-        target: 'pino/file', // Imprime a process.stdout por defecto si no hay destination
-        options: { destination: 1 },
-        level: 'info',
+        level: 'info', // Propiedad dummy para mantener compatibilidad
+        info: (msg, data) => {
+            console.log(formatMessage('info', icons.info, msg, component) + formatearData(data));
+        },
+        success: (msg, data) => {
+            console.log(formatMessage('success', icons.success, msg, component) + formatearData(data));
+        },
+        error: (msg, data) => {
+            console.error(formatMessage('error', icons.error, msg, component) + formatearData(data));
+        },
+        warn: (msg, data) => {
+            console.warn(formatMessage('warn', icons.warn, msg, component) + formatearData(data));
+        },
+        debug: (msg, data) => {
+            console.debug(formatMessage('debug', icons.debug, msg, component) + formatearData(data));
+        },
+        fatal: (msg, data) => {
+            console.error(formatMessage('fatal', icons.fatal, `[FATAL RUNTIME] ${msg}`, component) + formatearData(data));
+        },
+        child: (options) => createLogger(options.component)
     };
 };
-const transport = pino_1.default.transport({
-    targets: [
-        getConsoleTransport(),
-        {
-            target: 'pino/file',
-            options: {
-                destination: path_1.default.join(logDir, 'combined.log'),
-                mkdir: true,
-                append: true
-            },
-            level: 'info',
-        },
-        {
-            target: 'pino/file',
-            options: {
-                destination: path_1.default.join(logDir, 'error.log'),
-                mkdir: true,
-                append: true
-            },
-            level: 'error',
-        },
-    ],
-});
-const logger = (0, pino_1.default)({
-    level: logLevel,
-    base: {
-        service: 'pet-care-studio-backend',
-        version: process.env.npm_package_version || '1.0.0',
-        environment: process.env.NODE_ENV || 'development'
-    },
-    timestamp: pino_1.default.stdTimeFunctions.isoTime,
-    // En producción, reducir verbosidad para performance
-    formatters: isProduction ? {
-        level: (label) => ({ level: label }),
-        log: (object) => {
-            // Eliminar campos verbose en producción
-            const { hostname, pid, ...cleaned } = object;
-            return cleaned;
-        }
-    } : undefined
-}, transport);
-// Logger específico para performance (menos verboso)
-exports.performanceLogger = logger.child({ component: 'performance' });
-// Logger específico para seguridad (siempre a nivel warn)
-exports.securityLogger = logger.child({ component: 'security' });
+const logger = createLogger();
+// Loggers específicos requeridos por la aplicación
+exports.performanceLogger = createLogger('performance');
+exports.securityLogger = createLogger('security');
 exports.securityLogger.level = 'warn';
-// Logger específico para auditoría (siempre info)
-exports.auditLogger = logger.child({ component: 'audit' });
+exports.auditLogger = createLogger('audit');
 exports.auditLogger.level = 'info';
 exports.default = logger;

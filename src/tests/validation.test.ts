@@ -126,9 +126,9 @@ describe('Logger Tests', () => {
   test('Structured Logging', () => {
     const spy = jest.spyOn(logger, 'info')
 
-    logger.info({ userId: '123', action: 'test' }, 'Test message')
+    logger.info('Test message', { userId: '123', action: 'test' })
 
-    expect(spy).toHaveBeenCalledWith({ userId: '123', action: 'test' }, 'Test message')
+    expect(spy).toHaveBeenCalledWith('Test message', { userId: '123', action: 'test' })
 
     spy.mockRestore()
   })
