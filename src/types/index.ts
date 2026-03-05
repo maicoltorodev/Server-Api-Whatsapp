@@ -54,7 +54,8 @@ export type ICatalogItem = z.infer<typeof CatalogItemSchema>;
 
 export const PetProfileSchema = z.object({
   name: z.string(),
-  allergies: z.array(z.string()).optional(),
+  breed: z.string().optional(),
+  medical: z.array(z.string()).optional(),
   behavior: z.string().optional(),
   preferences: z.array(z.string()).optional(),
   notes: z.string().optional(),

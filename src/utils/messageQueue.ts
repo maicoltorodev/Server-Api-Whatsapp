@@ -3,21 +3,20 @@ const logger = require('../utils/logger').default;
 
 class MessageQueue {
   queues: Map<string, any>;
+  processingPhones: Set<string>;
   delayMs: number;
 
   constructor() {
     this.queues = new Map();
-    // Reloj de tolerancia: 3 segundos (3000 ms)
-    this.delayMs = 3000;
+    this.processingPhones = new Set();
+    // Reloj de tolerancia incrementado a 5 segundos para mejor agrupación de ideas
+    this.delayMs = 5000;
   }
 
   /**
    * Encola un mensaje entrante de WhatsApp.
    * Si llegan múltiples mensajes del mismo número antes de que se acabe el reloj,
    * se agrupan en un solo bloque y se reinicia el reloj.
-   *
-   * @param from Teléfono del remitente
-   * @param text Texto del último mensaje
    */
   enqueueMessage(from: string, text: string) {
     if (this.queues.has(from)) {
@@ -26,12 +25,12 @@ class MessageQueue {
       clearTimeout(userQueue.timer);
 
       logger.info(
-        `[EMBUDO] Ráfaga activa (${userQueue.messages.length} msgs) para ${from}. Reloj reiniciado a 3s.`
+        `[EMBUDO] Ráfaga activa (${userQueue.messages.length} msgs) para ${from}. Reloj reiniciado a 5s.`
       );
 
       userQueue.timer = setTimeout(() => this.processMessages(from), this.delayMs);
     } else {
-      logger.info(`[EMBUDO] Recibiendo mensaje de ${from}... Esperando 3s por si manda más.`);
+      logger.info(`[EMBUDO] Recibiendo mensaje de ${from}... Esperando 5s por si manda más.`);
       const timer = setTimeout(() => this.processMessages(from), this.delayMs);
       this.queues.set(from, {
         messages: [text],
@@ -45,13 +44,20 @@ class MessageQueue {
    * junta todos los mensajes de la cola y los dispara de un solo golpe a Gemini.
    */
   async processMessages(from: string) {
+    // Protección de Concurrencia por Usuario: 
+    // Si ya hay un proceso de IA corriendo para este teléfono, esperamos para no duplicar.
+    if (this.processingPhones.has(from)) {
+      logger.warn(`[EMBUDO] El usuario ${from} ya tiene un proceso activo. Re-programando proceso en 1s...`);
+      setTimeout(() => this.processMessages(from), 1000);
+      return;
+    }
+
     const userQueue = this.queues.get(from);
     if (!userQueue) return;
 
-    // 1. Lo quitamos de la sala de espera
+    this.processingPhones.add(from);
     this.queues.delete(from);
 
-    // 2. Combinamos todo de forma natural (con un '. ' entre párrafos o solo un espacio)
     const combinedText = userQueue.messages.join('. ');
 
     logger.info(
@@ -66,6 +72,10 @@ class MessageQueue {
         await conversationService.handleIncomingMessage(from, combinedText);
       } catch (error: any) {
         logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
+      } finally {
+        // Liberar el bloqueo para este teléfono una vez terminada la respuesta
+        this.processingPhones.delete(from);
+        logger.info(`[EMBUDO] Proceso finalizado para ${from}. Bloqueo liberado.`);
       }
     });
   }

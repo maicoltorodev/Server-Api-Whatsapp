@@ -10,10 +10,6 @@ const config = {
   META_APP_SECRET: process.env.META_APP_SECRET || 'placeholder_secret_para_dev',
   VERIFY_TOKEN: process.env.VERIFY_TOKEN,
 
-  // Owner and Bot Numbers
-  OWNER_NUMBER: process.env.OWNER_NUMBER,
-  BOT_NUMBER: process.env.BOT_NUMBER,
-
   // AI Configuration
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 

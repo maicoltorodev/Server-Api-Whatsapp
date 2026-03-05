@@ -51,8 +51,7 @@ PHONE_NUMBER_ID=tu_phone_id
 WHATSAPP_TOKEN=tu_token
 META_APP_SECRET=tu_app_secret
 VERIFY_TOKEN=tu_verify_token
-OWNER_NUMBER=tu_numero
-BOT_NUMBER=tu_numero_bot
+
 GEMINI_API_KEY=tu_gemini_key
 SUPABASE_URL=tu_supabase_url
 SUPABASE_KEY=tu_supabase_key

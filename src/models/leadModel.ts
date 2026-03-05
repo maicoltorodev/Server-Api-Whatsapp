@@ -97,12 +97,12 @@ class LeadModel {
     let pet = history.pets.find((p) => p.name?.toLowerCase() === petName?.toLowerCase());
 
     if (!pet) {
-      pet = { name: petName, allergies: [], behavior: '', preferences: [], notes: '' };
+      pet = { name: petName, breed: '', medical: [], behavior: '', preferences: [], notes: '' };
       history.pets.push(pet);
     }
 
-    // Si la categoría contiene un arreglo (ej: allergies)
-    if (['allergies', 'preferences'].includes(category)) {
+    // Si la categoría contiene un arreglo (ej: medical, preferences)
+    if (['medical', 'preferences'].includes(category)) {
       if (!pet[category]) pet[category] = [];
       // Agregar sin duplicar
       if (!pet[category].includes(value)) {

@@ -16,7 +16,7 @@ class WebhookController {
     res.sendStatus(200);
 
     try {
-      logger.info('--- 📥 NUEVO WEBHOOK DE WHATSAPP ---');
+      logger.info('🟢 [WEBHOOK] --- NUEVO WEBHOOK DE WHATSAPP ---');
       // 1. Extraer mensaje
       const message = whatsappService.extractMessageFromWebhook(body);
       if (!message) {
@@ -25,7 +25,7 @@ class WebhookController {
       }
 
       const { id: msgId, from, text, isText } = message;
-      logger.info(`Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
+      logger.info(`🔵 [MENSAJE NUEVO] Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
 
       // 2. Seguridad y Duplicados
       if (rateLimiter.isMessageProcessed(msgId)) {
@@ -45,7 +45,7 @@ class WebhookController {
         return;
       }
 
-      logger.info(`Texto recibido: "${text}"`);
+      logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
 
       // 4. Rate Limiting (Spam)
       if (rateLimiter.isUserSpamming(from)) {

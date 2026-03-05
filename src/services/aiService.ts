@@ -105,7 +105,7 @@ class AIService {
     });
 
     logger.info(
-      `[IA] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`
+      `[IA - PROCESANDO] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`
     );
 
     const result = await this._withRetry(async () => {
@@ -155,7 +155,7 @@ class AIService {
             functionResponse: { name: toolName, response: toolResult },
           });
         } catch (error: any) {
-          logger.error(`[TOOL] Error fatal en ${toolName}`, { error });
+          logger.error(`❌ [TOOL - ERROR] Error fatal en ${toolName}`, { error });
           toolResponses.push({
             functionResponse: {
               name: toolName,
@@ -278,7 +278,7 @@ class AIService {
         if (!shouldRetry || i === maxRetries - 1) break;
 
         const delay = Math.pow(2, i) * 1000;
-        logger.warn(`[IA] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, {
+        logger.warn(`⚠️ [IA - REINTENTO] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, {
           error: error.message,
         });
         await new Promise((res) => setTimeout(res, delay));
