@@ -25,11 +25,11 @@ class WhatsAppService {
                 type: 'text',
                 text: { body: text },
             }, { headers: this.headers });
-            logger.info(`Mensaje enviado a ${to}: ${text.substring(0, 50)}...`);
+            logger.info(`✅ [WHATSAPP API] Mensaje enviado a ${to}: "${text.substring(0, 50)}..."`);
         }
         catch (error) {
             const errorData = error.response?.data;
-            logger.error('Error enviando mensaje WhatsApp', {
+            logger.error(`❌ [WHATSAPP API - ERROR] No se pudo enviar el mensaje a ${to}.`, {
                 message: error.message,
                 metaError: errorData,
                 stack: error.stack,
@@ -49,7 +49,7 @@ class WhatsAppService {
             }, { headers: this.headers });
         }
         catch (error) {
-            logger.error('Error marcando mensaje como leído', {
+            logger.error(`❌ [WHATSAPP API - ERROR] Error marcando mensaje como leído (ID: ${messageId})`, {
                 error: error.response?.data || error.message,
             });
             // No lanzamos el error para no interrumpir el flujo principal

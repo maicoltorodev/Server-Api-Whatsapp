@@ -13,30 +13,30 @@ class ConversationService {
      * Procesa un mensaje entrante de un cliente de principio a fin
      */
     async handleIncomingMessage(phone, message) {
-        logger.info(`--- 🤖 ORQUESTADOR DE CONVERSACIÓN: ${phone} ---`);
+        logger.info(`🤖 [ORQUESTADOR] Iniciando proceso para el número: ${phone}`);
         // 1. Obtener o crear Lead Raw
         let rawLead = await leadModel.getByPhone(phone);
         if (!rawLead) {
-            logger.info(`Lead nuevo detectado. Creando perfil inicial para ${phone}...`);
+            logger.info(`[PASO 1] Lead nuevo detectado. Creando perfil inicial para ${phone}...`);
             rawLead = await leadModel.upsert({ phone, name: 'Nuevo Cliente', bot_active: true });
         }
         // Obtenemos el tipo validado estrictamente (Fallback a crudo si la migración de BD tiene esquemas raros)
         const parsed = types_1.LeadProfileSchema.safeParse(rawLead);
         const leadData = parsed.success ? parsed.data : rawLead;
-        logger.info(`Lead existente: ${leadData.name || 'Sin nombre'} | Bot Activo: ${leadData.bot_active} | Etapa: ${leadData.current_step}`);
+        logger.info(`[PASO 1] Lead existente: ${leadData.name || 'Sin nombre'} | Bot Activo: ${leadData.bot_active} | Etapa: ${leadData.current_step}`);
         // 2. Registrar mensaje del cliente
-        logger.info(`Guardando mensaje del cliente en historial...`);
+        logger.info(`[PASO 2] Guardando mensaje "${message}" en el historial...`);
         await chatModel.addMessage(phone, { role: 'user', parts: [{ text: message }] });
         // Notificar al dashboard que hay un nuevo mensaje (sin esperar a la IA)
         systemEvents.emit('lead_updated', { phone, type: 'new_message' });
         logger.info(`Evento 'lead_updated' emitido al Dashboard.`);
         // 3. Verificar si el bot debe responder
         if (leadData.bot_active === false) {
-            logger.info(`El Bot está pausado para este cliente. No se generará respuesta automática.`);
+            logger.info(`[PASO 3] El Bot está pausado para ${phone}. No se generará respuesta automática.`);
             return await this.handleHumanIntervention(phone, leadData, message);
         }
         // 4. Procesar con IA
-        logger.info(`Iniciando motor de IA para procesar respuesta...`);
+        logger.info(`[PASO 4] Iniciando motor de IA para procesar respuesta para ${phone}...`);
         return await this.processWithAI(phone, message, leadData);
     }
     /**
@@ -53,12 +53,12 @@ class ConversationService {
     async processWithAI(phone, message, leadData) {
         try {
             // A. Preparar contexto e historial
-            logger.info(`Preparando contexto dinámico (catálogo, etapa, resumen)...`);
+            logger.info(`[IA - INICIO] Preparando contexto dinámico (catálogo, etapa, resumen) para ${phone}...`);
             const model = await aiService.prepareContext(leadData);
             const history = await chatModel.getHistory(phone);
             logger.info(`Historial cargado: ${history.length} mensajes previos.`);
             // B. Generar respuesta
-            logger.info(`Consultando a Gemini...`);
+            logger.info(`[IA - PROCESANDO] Consultando a Gemini para ${phone}...`);
             const aiResponse = await aiService.generateResponse(model, message, history);
             let responseText = '';
             // C. Manejar Function Calls (si existen)
@@ -77,21 +77,21 @@ class ConversationService {
                 logger.warn(`La IA no devolvió texto. Usando respuesta amigable por defecto.`);
                 responseText = '¡Entendido! ¿En qué más puedo ayudarte con tu mascota? 🐾';
             }
-            // D. Persistir cambios de la sesión (historial con respuesta IA)
-            logger.info(`Actualizando historial de chat con la respuesta de la IA...`);
-            const updatedHistory = await aiResponse.chatSession.getHistory();
-            await chatModel.saveHistory(phone, updatedHistory);
+            // D. Persistir respuesta de la IA en el historial (de forma incremental)
+            logger.info(`[IA - RESPUESTA FINAL] Respuesta generada para ${phone}: "${responseText}"`);
+            logger.info(`Guardando la respuesta de la IA en el historial...`);
+            await chatModel.addMessage(phone, { role: 'model', parts: [{ text: responseText }] });
             // E. Enviar al cliente
-            logger.info(`Enviando respuesta a WhatsApp...`);
+            logger.info(`[PASO 5] Enviando respuesta a WhatsApp para ${phone}...`);
             await whatsappService.sendMessage(phone, responseText);
-            logger.info(`Respuesta enviada con éxito.`);
+            logger.info(`[ÉXITO] Respuesta enviada correctamente al cliente ${phone}.`);
             // F. Notificar actualización final
             systemEvents.emit('lead_updated', { phone, type: 'ai_response' });
             logger.info(`Evento 'ai_response' emitido al Dashboard.`);
             return { status: 'ai_responded', text: responseText };
         }
         catch (error) {
-            logger.error(`Error en flujo de IA [${phone}]`, { error });
+            logger.error(`❌ [ERROR - IA] Error en flujo de IA [${phone}]`, { error });
             const errorMsg = 'Disculpa, tuve un pequeño problema técnico. ¿Podrías repetirme eso?';
             await whatsappService.sendMessage(phone, errorMsg);
             return { status: 'error', error: error.message };
@@ -124,16 +124,6 @@ class ConversationService {
     async toggleBot(phone, active) {
         if (active) {
             await leadModel.activateBot(phone);
-            const msg = '¡Listo! El asistente virtual está de nuevo a tu disposición. 🤖';
-            await whatsappService.sendMessage(phone, msg);
-            await chatModel.addMessage(phone, {
-                role: 'model',
-                parts: [
-                    {
-                        text: `[NOTA DEL SISTEMA: SE REACTIVÓ A LA IA. EL SISTEMA ENVIÓ ESTE MENSAJE]: "${msg}"`,
-                    },
-                ],
-            });
         }
         else {
             await leadModel.deactivateBot(phone);

@@ -21,7 +21,7 @@ class AIService {
         // Construir el Prompt Maestro Modularmente
         const systemInstruction = new SystemPromptBuilder()
             .setTimeContext(config.TIMEZONE)
-            .setLeadContext(leadData?.current_step, leadData?.summary)
+            .setLeadContext(leadData?.name, leadData?.current_step, leadData?.summary)
             .setMedicalHistory(leadData?.medical_history)
             .setCatalog(catalogString)
             .setOperations(appConfig)
@@ -61,6 +61,18 @@ class AIService {
     async prepareContext(leadData) {
         return await this.initializeModel(leadData);
     }
+    _cleanupModelResponse(text) {
+        if (!text)
+            return text;
+        // 1. Eliminar cualquier línea que empiece con "引导:" o "Guidance:" o "Thought:" etc.
+        // 2. Eliminar cualquier rastro de llamadas a funciones en texto plano (ej: update_lead_info(...))
+        return text
+            .toString()
+            .replace(/^(引导|Guidance|Thought|Reflexión|Analísis|Pensamiento):.*$/gim, '')
+            .replace(/^[a-z_]+\(.*\)$/gm, '') // Elimina líneas que parecen llamadas a funciones
+            .replace(/```[a-z]*[\s\S]*?```/g, '') // Elimina bloques de código accidentales
+            .trim();
+    }
     _filterSafetyFalsePositives(text) {
         if (!text)
             return text;
@@ -79,7 +91,7 @@ class AIService {
         const chatSession = model.startChat({
             history: sanitizedHistory,
         });
-        logger.info(`[IA] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`);
+        logger.info(`[IA - PROCESANDO] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`);
         const result = await this._withRetry(async () => {
             return await chatSession.sendMessage(safeMessage);
         });
@@ -96,7 +108,7 @@ class AIService {
         }
         return {
             functionCalls: calls,
-            text: result.response.text(),
+            text: this._cleanupModelResponse(result.response.text()),
             chatSession,
         };
     }
@@ -120,7 +132,7 @@ class AIService {
                     });
                 }
                 catch (error) {
-                    logger.error(`[TOOL] Error fatal en ${toolName}`, { error });
+                    logger.error(`❌ [TOOL - ERROR] Error fatal en ${toolName}`, { error });
                     toolResponses.push({
                         functionResponse: {
                             name: toolName,
@@ -137,7 +149,7 @@ class AIService {
             if (usage) {
                 logger.info(`[IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`);
             }
-            finalResponse.text = result.response.text();
+            finalResponse.text = this._cleanupModelResponse(result.response.text());
             currentCalls = result.response.functionCalls();
             if (currentCalls && currentCalls.length > 0) {
                 logger.info(`[IA] Gemini pidió más llamadas: ${currentCalls.map((c) => c.name).join(', ')}`);
@@ -219,7 +231,7 @@ class AIService {
                 if (!shouldRetry || i === maxRetries - 1)
                     break;
                 const delay = Math.pow(2, i) * 1000;
-                logger.warn(`[IA] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, {
+                logger.warn(`⚠️ [IA - REINTENTO] Intento ${i + 1} fallido. Reintentando en ${delay}ms...`, {
                     error: error.message,
                 });
                 await new Promise((res) => setTimeout(res, delay));

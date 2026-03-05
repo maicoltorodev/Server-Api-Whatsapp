@@ -12,7 +12,10 @@ const tools = {
             parameters: {
                 type: 'OBJECT',
                 properties: {
-                    name: { type: 'STRING' },
+                    name: {
+                        type: 'STRING',
+                        description: 'Nombre REAL del humano (persona). PROHIBIDO usar el nombre de la mascota aquí. PROHIBIDO usar "Cliente de [Mascota]".'
+                    },
                     product_service: { type: 'STRING' },
                     appointment_date: { type: 'STRING' },
                     budget: { type: 'STRING' },
@@ -48,6 +51,10 @@ const tools = {
             parameters: {
                 type: 'OBJECT',
                 properties: {
+                    customer_name: {
+                        type: 'STRING',
+                        description: 'Nombre REAL y apellido de la PERSONA (Humano). PROHIBIDO usar el nombre de la mascota o "Cliente de [Mascota]".',
+                    },
                     service: { type: 'STRING', description: 'El servicio a agendar (ej. Baño, Peluquería)' },
                     pet_name: {
                         type: 'STRING',
@@ -60,7 +67,7 @@ const tools = {
                         description: 'Duración en minutos según el catálogo.',
                     },
                 },
-                required: ['service', 'pet_name', 'date', 'start_time', 'duration_minutes'],
+                required: ['customer_name', 'service', 'pet_name', 'date', 'start_time', 'duration_minutes'],
             },
         },
         {
@@ -94,7 +101,7 @@ const tools = {
         },
         {
             name: 'save_pet_preference',
-            description: 'HERRAMIENTA DE MEMORIA PERMANENTE. Úsala INMEDIATAMENTE cuando el cliente mencione un dato vital o preferencia a largo plazo (alergias, comportamientos de la mascota, disgustos, raza). Un cliente puede tener varias mascotas, asegúrate de preguntar o identificar de cuál habla.',
+            description: 'HERRAMIENTA DE MEMORIA PERMANENTE. Úsala INMEDIATAMENTE cuando el cliente mencione un dato vital o preferencia a largo plazo. 1. MEDICAL: Úsala para Salud y Cuidados (alergias, condiciones médicas como dermatitis, requerimientos de salud). 2. BEHAVIOR: Temperamento y conducta. 3. PREFERENCES: Gustos o miedos. Un cliente puede tener varias mascotas, identifica de cuál habla.',
             parameters: {
                 type: 'OBJECT',
                 properties: {
@@ -104,12 +111,12 @@ const tools = {
                     },
                     category: {
                         type: 'STRING',
-                        enum: ['allergies', 'behavior', 'preferences', 'notes'],
-                        description: 'Categoría del historial.',
+                        enum: ['breed', 'medical', 'behavior', 'preferences', 'notes'],
+                        description: 'Categoría del historial. Usa "breed" para la raza, "medical" para Salud y Cuidados.',
                     },
                     value: {
                         type: 'STRING',
-                        description: "El dato a guardar (ej. 'Alergia al pollo', 'Nervioso con secadora', 'Poodle').",
+                        description: "El dato a guardar (ej. 'Dermatitis en pata', 'Nervioso con secadora', 'Alergia al shampoo').",
                     },
                 },
                 required: ['pet_name', 'category', 'value'],

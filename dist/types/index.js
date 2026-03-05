@@ -45,7 +45,8 @@ exports.CatalogItemSchema = zod_1.z.object({
 // ==========================================
 exports.PetProfileSchema = zod_1.z.object({
     name: zod_1.z.string(),
-    allergies: zod_1.z.array(zod_1.z.string()).optional(),
+    breed: zod_1.z.string().optional(),
+    medical: zod_1.z.array(zod_1.z.string()).optional(),
     behavior: zod_1.z.string().optional(),
     preferences: zod_1.z.array(zod_1.z.string()).optional(),
     notes: zod_1.z.string().optional(),
