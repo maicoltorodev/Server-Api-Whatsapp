@@ -8,19 +8,16 @@ const tools = {
     functionDeclarations: [
         {
             name: 'update_lead_info',
-            description: 'Actualiza la información del cliente y el estado del embudo de ventas.',
+            description: 'HERRAMIENTA DE MEMORIA: Solo úsala si el humano dice MÍNIMO uno de estos 2 datos clave: [1. Su nombre real] [2. Avanza de etapa (pide separar cita -> pasa a AGENDA)]. PROHIBIDO usarla como diario o cadena de pensamiento. NO la uses de forma rutinaria tras cada mensaje.',
             parameters: {
                 type: 'OBJECT',
                 properties: {
                     name: {
                         type: 'STRING',
-                        description: 'Nombre REAL del humano (persona). PROHIBIDO usar el nombre de la mascota aquí. PROHIBIDO usar "Cliente de [Mascota]".'
+                        description: 'Nombre REAL del humano (persona). PROHIBIDO usar "Cliente de [Mascota]".'
                     },
                     product_service: { type: 'STRING' },
-                    appointment_date: { type: 'STRING' },
-                    budget: { type: 'STRING' },
-                    current_step: { type: 'STRING', enum: ['SALUDO', 'CALIFICACION', 'AGENDA', 'CIERRE'] },
-                    summary: { type: 'STRING', description: 'Breve síntesis del hilo ACTUAL de la conversación (ej: "Cotizando baño para perro mediano. Esperando fecha"). NO acumules historial viejo, enfócate en la acción en curso.' },
+                    current_step: { type: 'STRING', enum: ['SALUDO', 'CALIFICACION', 'AGENDA', 'CIERRE'] }
                 },
             },
         },

@@ -1,5 +1,6 @@
 const supabase = require('../../config/database');
 const logger = require('../../utils/logger').default;
+const systemLogModel = require('../../models/systemLogModel');
 import { AppConfigSchema, IAppConfig, CatalogItemSchema, ICatalogItem } from '../../types';
 
 class ConfigProvider {
@@ -9,7 +10,7 @@ class ConfigProvider {
   private catalogString: string = '';
   private isInitialized: boolean = false;
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): ConfigProvider {
     if (!ConfigProvider.instance) {
@@ -114,8 +115,12 @@ class ConfigProvider {
 
       this.isInitialized = true;
       logger.info('[ConfigProvider] Configuración en RAM cargada exitosamente.');
-    } catch (error) {
+    } catch (error: any) {
       logger.error('[ConfigProvider] Fallo crítico cargando configuración:', { error });
+
+      // Registrar error estructural/crítico en DB
+      systemLogModel.log('error', 'Fallo crítico cargando configuración en RAM', null, null, error.stack);
+
       if (!this.isInitialized) {
         // Si falla en el primer arranque, inicializa con defaults
         this.config = AppConfigSchema.parse({});

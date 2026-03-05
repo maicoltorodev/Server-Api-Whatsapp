@@ -16,13 +16,13 @@ class WebhookController {
         const body = req.body;
         res.sendStatus(200);
         try {
-            logger.info('🟢 [WEBHOOK] --- NUEVO WEBHOOK DE WHATSAPP ---');
-            // 1. Extraer mensaje
+            // 1. Extraer mensaje de los metadatos
             const message = whatsappService.extractMessageFromWebhook(body);
             if (!message) {
-                logger.info('Webhook sin mensaje procesable (bloque de estado o lectura).');
+                // Ignoramos silenciosamente notificaciones de lectura o estado
                 return;
             }
+            logger.info('🟢 [WEBHOOK] --- NUEVO MENSAJE DE WHATSAPP DETECTADO ---');
             const { id: msgId, from, text, isText } = message;
             logger.info(`🔵 [MENSAJE NUEVO] Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
             // 2. Seguridad y Duplicados

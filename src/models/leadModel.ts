@@ -58,7 +58,14 @@ class LeadModel {
    * Desactiva el bot para un lead
    */
   async deactivateBot(phone) {
-    return await this.updateStatus(phone, { bot_active: false });
+    return await this.updateStatus(phone, { bot_active: false, human_review_pending: true });
+  }
+
+  /**
+   * Limpia el estado de pendiente de revisión
+   */
+  async clearReviewPending(phone) {
+    return await this.updateStatus(phone, { human_review_pending: false });
   }
 
   /**
@@ -75,12 +82,6 @@ class LeadModel {
     return await this.updateStatus(phone, { current_step: step });
   }
 
-  /**
-   * Actualiza el resumen del lead (Corto plazo)
-   */
-  async updateSummary(phone, summary) {
-    return await this.updateStatus(phone, { summary });
-  }
 
   /**
    * Actualiza un fragmento específico del Historial Médico (Largo plazo)
@@ -114,6 +115,33 @@ class LeadModel {
     }
 
     return await this.updateStatus(phone, { medical_history: history });
+  }
+
+  /**
+   * Obtiene la lista de "Leads Fríos"
+   * Criterios: Silencio > 4h y < 22h, sin cita agendada, no re-contactado hoy.
+   */
+  async getColdLeads() {
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const twentyTwoHoursAgo = new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .lt('last_customer_message_at', fourHoursAgo)
+      .gt('last_customer_message_at', twentyTwoHoursAgo)
+      .neq('status', 'agendada')
+      // No re-contactado en las últimas 24h (para evitar spam)
+      .or(`last_reengagement_at.is.null,last_reengagement_at.lt.${twentyFourHoursAgo}`)
+      .order('last_customer_message_at', { ascending: true }); // Los más viejos primero
+
+    if (error) {
+      logger.error('BD Error (leadModel.getColdLeads)', { error });
+      throw error;
+    }
+
+    return data;
   }
 }
 

@@ -11,13 +11,9 @@ class ToolService {
     async update_lead_info(args, phone) {
         logger.info(`[TOOL] Executing: update_lead_info for ${phone}`, { args });
         try {
-            if (args.summary)
-                await leadModel.updateSummary(phone, args.summary);
-            // Actualizar otros campos si vienen en args (name, pet_name, etc)
-            const { summary, ...otherData } = args;
-            if (Object.keys(otherData).length > 0) {
-                logger.debug(`[TOOL] Updating additional fields`, { otherData });
-                await leadModel.updateStatus(phone, otherData);
+            if (Object.keys(args).length > 0) {
+                logger.debug(`[TOOL] Updating lead fields`, { args });
+                await leadModel.updateStatus(phone, args);
             }
             logger.info(`[TOOL] Success: Lead info updated.`);
             return { status: 'ok', message: 'Información actualizada correctamente.' };
@@ -49,6 +45,11 @@ class ToolService {
         }
         else {
             logger.warn(`[TOOL] Failed to book: ${result.message}`);
+            // PRO TIP: Devolvemos el mensaje exacto para que la IA sepa explicar el 'Por Qué'
+            return {
+                status: 'error',
+                message: `No se pudo agendar: ${result.message}. Si el problema es de horario o cupo, pide disculpas y ofrece las alternativas disponibles más cercanas.`
+            };
         }
         return result;
     }

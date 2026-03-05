@@ -7,6 +7,7 @@ const toolService = require('./toolService');
 const logger = require('../utils/logger').default;
 const ConfigProvider = require('../core/config/ConfigProvider').default;
 const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
+const appointmentService = require('./appointmentService');
 class AIService {
     constructor() { }
     /**
@@ -17,16 +18,17 @@ class AIService {
         logger.info(`[IA] Inicializando instancia de modelo para ${leadData?.phone}...`);
         // Obtener configuración inmutable desde RAM
         const appConfig = ConfigProvider.getConfig();
-        const catalogString = ConfigProvider.getCatalogString();
+        const catalogArray = ConfigProvider.getCatalogArray();
+        // Obtener citas activas para el contexto de cambio/cancelación
+        const activeAppts = await appointmentService.getActiveAppointmentsByPhone(leadData?.phone);
         // Construir el Prompt Maestro Modularmente
         const systemInstruction = new SystemPromptBuilder()
-            .setTimeContext(config.TIMEZONE)
-            .setLeadContext(leadData?.name, leadData?.current_step, leadData?.summary)
+            .setLeadContext(leadData?.name, leadData?.current_step)
             .setMedicalHistory(leadData?.medical_history)
-            .setCatalog(catalogString)
+            .setCatalog(catalogArray)
             .setOperations(appConfig)
+            .setActiveAppointments(activeAppts)
             .setMasterInstructions(appConfig)
-            .setHardcodedRules()
             .build();
         const safetySettings = [
             {
@@ -63,21 +65,29 @@ class AIService {
     }
     _cleanupModelResponse(text) {
         if (!text)
-            return text;
-        // 1. Eliminar cualquier línea que empiece con "引导:" o "Guidance:" o "Thought:" etc.
-        // 2. Eliminar cualquier rastro de llamadas a funciones en texto plano (ej: update_lead_info(...))
-        return text
-            .toString()
-            .replace(/^(引导|Guidance|Thought|Reflexión|Analísis|Pensamiento):.*$/gim, '')
-            .replace(/^[a-z_]+\(.*\)$/gm, '') // Elimina líneas que parecen llamadas a funciones
-            .replace(/```[a-z]*[\s\S]*?```/g, '') // Elimina bloques de código accidentales
-            .trim();
+            return '';
+        let cleaned = text.toString();
+        // 1. Eliminar bloques de pensamiento XML <thought>...</thought> o <thinking>
+        cleaned = cleaned.replace(/<(thought|thinking)>[\s\S]*?<\/\1>/gim, '');
+        cleaned = cleaned.replace(/<(thought|thinking)>[\s\S]*$/gim, '');
+        // 2. Eliminar headers de pensamiento de estilo plano y guía de Gemini
+        const thoughtHeaders = /^(引导|Guidance|Thought|Reflexión|Análisis|Pensamiento|Analísis|Thinking):.*$/gim;
+        cleaned = cleaned.replace(thoughtHeaders, '');
+        // 3. Eliminar rastro de prefijos de identidad (ej: "Miel: " o "Asistente: ")
+        cleaned = cleaned.replace(/^(Miel|Asistente|AI|Bot):\s*/gi, '');
+        // 4. Eliminar llamadas a funciones accidentales o bloques de código
+        cleaned = cleaned.replace(/^[a-z_]+\(.*\)$/gm, '');
+        cleaned = cleaned.replace(/```[a-z]*[\s\S]*?```/g, '');
+        // 5. Limpieza final de espacios y saltos de línea excesivos
+        return cleaned.replace(/\n{3,}/g, '\n\n').trim();
     }
     _filterSafetyFalsePositives(text) {
         if (!text)
             return text;
-        // Evita falsos positivos de la API de Gemini (Ej: bloqueos inquebrantables por palabras específicas como "loli")
-        return text.toString().replace(/\b[lL]oli\b/g, 'Loly');
+        // Evita falsos positivos críticos (Ej: mascotas llamadas "Loli")
+        return text.toString()
+            .replace(/\b[lL]oli\b/g, 'Loly')
+            .replace(/\b[lL]OL[iI]\b/g, 'LOLY');
     }
     /**
      * Genera una respuesta manejando el historial de forma segura
@@ -167,9 +177,9 @@ class AIService {
             sanitized.pop();
         }
         // 2. Limitar tamaño (Poda Dinámica de Historial para ahorrar Tokens)
-        // Solo enviamos los últimos 6 mensajes (aprox. 3 idas y vueltas)
+        // Solo enviamos los últimos 10 mensajes (cada uno puede ser un bloque agrupado)
         // La memoria a largo plazo se sostiene vía las actualizaciones en DB y el Prompt System.
-        const MAX_HISTORY = 6;
+        const MAX_HISTORY = 10;
         if (sanitized.length > MAX_HISTORY) {
             sanitized = sanitized.slice(-MAX_HISTORY);
         }

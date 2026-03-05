@@ -50,7 +50,18 @@ const formatearData = (data?: any) => {
 const formatMessage = (level: keyof typeof colors, icon: string, msg: string, component?: string) => {
   const prefix = component ? `${colors.bold}${colors.debug}[${component}]${colors.reset} ` : '';
   const color = colors[level] || colors.reset;
-  return `${getTimestamp()} ${icon} ${prefix}${color}${msg}${colors.reset}`;
+  const timestamp = getTimestamp();
+
+  // Soporte nativo multilínea: Si el mensaje trae saltos de línea (ej: grandes textos o prompts)
+  // prefijamos CADA línea con la marca de tiempo para que la consola se vea uniforme.
+  if (msg.includes('\n')) {
+    return msg
+      .split('\n')
+      .map(line => `${timestamp} ${icon} ${prefix}${color}${line}${colors.reset}`)
+      .join('\n');
+  }
+
+  return `${timestamp} ${icon} ${prefix}${color}${msg}${colors.reset}`;
 };
 
 const createLogger = (component?: string) => {

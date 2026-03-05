@@ -353,5 +353,28 @@ class AppointmentService {
         }
         return data || [];
     }
+    /**
+     * Obtiene todas las citas activas (futuras) de un lead por su teléfono
+     */
+    async getActiveAppointmentsByPhone(phone) {
+        const nowBogota = DateUtils.getTodayBogotaStr();
+        const { data, error } = await supabase
+            .from('appointments')
+            .select('id, pet_name, appointment_date, start_time')
+            .eq('phone', phone)
+            .neq('status', 'cancelada')
+            .gte('appointment_date', nowBogota)
+            .order('appointment_date', { ascending: true });
+        if (error) {
+            logger.error('Error obteniendo citas activas del lead', { error });
+            return [];
+        }
+        // Unificar fecha y hora para que el bot lo lea fácil
+        return data.map((a) => ({
+            id: a.id,
+            pet_name: a.pet_name,
+            start_at: `${a.appointment_date} ${a.start_time.substring(0, 5)}`
+        }));
+    }
 }
 module.exports = new AppointmentService();

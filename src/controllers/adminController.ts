@@ -1,4 +1,5 @@
 const supabase = require('../config/database');
+const leadModel = require('../models/leadModel');
 const conversationService = require('../services/conversationService');
 const systemEvents = require('../utils/eventEmitter');
 const logger = require('../utils/logger').default;
@@ -10,7 +11,7 @@ class AdminController {
    */
   async getLeads(req, res) {
     try {
-      let query = supabase.from('leads').select('*').order('updated_at', { ascending: false });
+      let query = supabase.from('leads').select('*').order('last_customer_message_at', { ascending: false });
 
       if (req.query.bot_active !== undefined) {
         query = query.eq('bot_active', req.query.bot_active === 'true');
@@ -102,6 +103,24 @@ class AdminController {
   }
 
   /**
+   * Marca un lead como revisado (Limpia el circulo rojo de pendiente)
+   */
+  async markLeadAsReviewed(req, res) {
+    try {
+      const { phone } = req.params;
+      const result = await leadModel.clearReviewPending(phone);
+
+      // Notificar al Dashboard para que desaparezca el circulo en tiempo real
+      systemEvents.emit('lead_updated', { phone, type: 'reviewed' });
+
+      res.json({ status: 'success', data: result });
+    } catch (error: any) {
+      logger.error('Dashboard Error (markLeadAsReviewed)', { error });
+      res.status(500).json({ status: 'error', message: 'Error marcando como revisado' });
+    }
+  }
+
+  /**
    * Invalida el cache del servidor para que la IA lea la nueva config de Supabase
    */
   async refreshConfig(req, res) {
@@ -143,6 +162,105 @@ class AdminController {
       systemEvents.removeListener('human_required', alertListener);
       systemEvents.removeListener('lead_updated', leadListener);
     });
+  }
+
+  /**
+   * Obtiene la lista de leads que necesitan re-engagement
+   */
+  async getColdLeads(req, res) {
+    try {
+      const data = await leadModel.getColdLeads();
+      res.json({ status: 'success', data });
+    } catch (error: any) {
+      logger.error('Dashboard Error (getColdLeads)', { error });
+      res.status(500).json({ status: 'error', message: 'Error obteniendo leads fríos' });
+    }
+  }
+
+  /**
+   * Genera un mensaje proactivo usando IA para un lead específico
+   */
+  async generateProactiveMessage(req, res) {
+    try {
+      const { phone } = req.params;
+      const lead = await leadModel.getByPhone(phone);
+
+      if (!lead) {
+        return res.status(404).json({ status: 'error', message: 'Lead no encontrado' });
+      }
+
+      const aiService = require('../services/aiService');
+      const hook = await aiService.generateProactiveHook(lead);
+
+      res.json({ status: 'success', data: { hook } });
+    } catch (error: any) {
+      logger.error('Dashboard Error (generateProactiveMessage)', { error });
+      res.status(500).json({ status: 'error', message: 'Error generando mensaje proactivo' });
+    }
+  }
+
+  /**
+   * Registra que se ha enviado un mensaje de re-engagement y actualiza la trazabilidad
+   */
+  async recordReengagement(req, res) {
+    try {
+      const { phone } = req.params;
+      const lead = await leadModel.getByPhone(phone);
+
+      if (!lead) {
+        return res.status(404).json({ status: 'error', message: 'Lead no encontrado' });
+      }
+
+      const updates = {
+        last_reengagement_at: new Date().toISOString(),
+        reengagement_count: (lead.reengagement_count || 0) + 1,
+        bot_active: false // Desactivamos el bot para que el humano siga la conversación
+      };
+
+      await leadModel.updateStatus(phone, updates);
+
+      // Notificar al dashboard
+      systemEvents.emit('lead_updated', { phone, type: 'reengagement_sent' });
+
+      res.json({ status: 'success', message: 'Re-engagement registrado correctamente' });
+    } catch (error: any) {
+      logger.error('Dashboard Error (recordReengagement)', { error });
+      res.status(500).json({ status: 'error', message: 'Error registrando re-engagement' });
+    }
+  }
+
+  /**
+   * Obtiene toda la data para el dashboard de Business Intelligence
+   */
+  async getAnalyticsData(req, res) {
+    logger.info('[BI] Petición de analíticas recibida');
+    const startTime = Date.now();
+    try {
+      const analyticsModel = require('../models/analyticsModel');
+
+      const [globalStats, serviceDistribution, heatmapData, petDemographics, iaEfficiency] = await Promise.all([
+        analyticsModel.getGlobalStats(),
+        analyticsModel.getServiceDistribution(),
+        analyticsModel.getHeatmapData(),
+        analyticsModel.getPetDemographics(),
+        analyticsModel.getIAEfficiency()
+      ]);
+
+      logger.info(`[BI] Analíticas generadas en ${Date.now() - startTime}ms`);
+      res.json({
+        status: 'success',
+        data: {
+          globalStats,
+          serviceDistribution,
+          heatmapData,
+          petDemographics,
+          iaEfficiency
+        }
+      });
+    } catch (error: any) {
+      logger.error('[BI] Error obteniendo datos analíticos:', { error: error.stack || error });
+      res.status(500).json({ status: 'error', message: 'Error obteniendo datos analíticos' });
+    }
   }
 
   /**

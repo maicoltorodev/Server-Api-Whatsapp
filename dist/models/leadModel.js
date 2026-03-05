@@ -65,12 +65,6 @@ class LeadModel {
         return await this.updateStatus(phone, { current_step: step });
     }
     /**
-     * Actualiza el resumen del lead (Corto plazo)
-     */
-    async updateSummary(phone, summary) {
-        return await this.updateStatus(phone, { summary });
-    }
-    /**
      * Actualiza un fragmento específico del Historial Médico (Largo plazo)
      * Soporta múltiples mascotas por lead usando un arreglo de mascotas.
      */
