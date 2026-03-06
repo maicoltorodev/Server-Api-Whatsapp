@@ -113,10 +113,10 @@ export class AnalyticsModel {
                     revenue: {
                         realized: revenue.realized,
                         projected: revenue.projected,
-                        value: revenue.realized + revenue.projected, // Total para visualización rápida
-                        trend: "+12"
+                        value: revenue.realized + revenue.projected,
+                        trend: "0" // Eliminada tendencia harcodeada
                     },
-                    loyalty: { value: loyalty.toFixed(1), trend: "+5" },
+                    loyalty: { value: loyalty.toFixed(1), trend: "0" }, // Eliminada tendencia harcodeada
                     efficiency: { value: hoursSaved.toFixed(1), unit: 'hrs' }
                 },
                 charts: {
@@ -160,11 +160,12 @@ export class AnalyticsModel {
         let projected = 0;
 
         appts.forEach(a => {
-            if (a.status === 'cancelada') return;
+            // Ignorar citas canceladas o sin fecha válida
+            if (a.status === 'cancelada' || !a.appointment_date) return;
 
             const service = services.find(s => s.id === a.service_id);
-            const price = service ? Number(service.price || 0) : 50000;
-            const apptDate = a.appointment_date; // Formato YYYY-MM-DD
+            const price = service ? Number(service.price || 0) : 0; // Fallback a 0 en lugar de 50.000 hardcoded
+            const apptDate = a.appointment_date;
 
             // Dinero en Caja: Citas pasadas DENTRO del periodo P1
             if (apptDate < todayStr && apptDate >= p1Start) {
@@ -250,39 +251,66 @@ export class AnalyticsModel {
     }
 
     private generateInsights(services: any[], heatmap: any[], savings: number, conversion: number, revenue: any, period: number) {
-        const bestService = services[0]?.name || "N/A";
-        const peakHour = [...heatmap].sort((a, b) => b.mjes - a.mjes)[0]?.hour || "10:00";
+        const hasServices = services && services.length > 0 && services.some(s => s.value > 0);
+        const bestService = hasServices ? services[0]?.name : null;
         const projected = revenue.projected || 0;
+        const totalActivity = heatmap.reduce((acc: number, h: any) => acc + h.mjes, 0);
 
-        const insights = [
-            {
-                title: "Ahorro Mensual",
-                text: `Miel te ha ahorrado aproximadamente ${savings.toFixed(1)} horas de atención manual en este ciclo de ${period} días.`,
+        const insights = [];
+
+        // 1. Insight de Eficiencia (Miel)
+        if (savings > 0) {
+            insights.push({
+                title: "Ahorro Estratégico",
+                text: `Miel ha gestionado la atención de forma autónoma, ahorrándote aproximadamente ${savings.toFixed(1)} horas de trabajo manual en este ciclo.`,
                 type: "positive"
-            },
-            {
-                title: "Oportunidad de Oro",
-                text: `"${bestService}" lidera la demanda. Considera lanzar un pack promocional los días de baja actividad para maximizar ingresos.`,
+            });
+        } else {
+            insights.push({
+                title: "Optimización de Inicio",
+                text: "Aún no hay mensajes procesados por la IA. Una vez que los clientes empiecen a interactuar, mediré el tiempo de respuesta ahorrado.",
                 type: "strategic"
-            }
-        ];
+            });
+        }
 
-        // Insight Prospectivo (Futuro)
+        // 2. Insight de Ventas / Servicios
+        if (bestService) {
+            insights.push({
+                title: "Oportunidad de Oro",
+                text: `"${bestService}" es tu servicio más solicitado. Podrías aumentar el ticket promedio ofreciendo un complemento exclusivo para este servicio.`,
+                type: "strategic"
+            });
+        } else {
+            insights.push({
+                title: "Catálogo Silencioso",
+                text: "No detecto demanda de servicios específicos. Asegúrate de que los nombres de los servicios en el catálogo coincidan con lo que los clientes preguntan.",
+                type: "strategic"
+            });
+        }
+
+        // 3. Insight Prospectivo o de Actividad
         if (projected > 0) {
             insights.push({
                 title: "Previsión de Ingresos",
-                text: `Tienes $${projected.toLocaleString()} en agenda para los próximos ${period} días. Asegúrate de confirmar estas citas para asegurar el flujo.`,
+                text: `Tienes $${projected.toLocaleString()} en ingresos proyectados para los próximos días. Un recordatorio automático podría asegurar estas citas.`,
+                type: "info"
+            });
+        } else if (totalActivity > 0) {
+            const peakHour = [...heatmap].sort((a, b) => b.mjes - a.mjes)[0]?.hour || "10:00";
+            insights.push({
+                title: "Pico de Tráfico",
+                text: `Tu mayor volumen de consultas ocurre cerca de las ${peakHour}. Es el momento ideal para estar atento a cierres manuales si es necesario.`,
                 type: "info"
             });
         } else {
             insights.push({
-                title: "Pico de Tráfico",
-                text: `Históricamente, tu mayor actividad es a las ${peakHour}. Planifica descansos de personal fuera de este rango.`,
+                title: "Esperando Tracción",
+                text: "El sistema está listo y sincronizado. En cuanto entre el primer lead, empezaré a proyectar tendencias y proyecciones de caja.",
                 type: "info"
             });
         }
 
-        return insights;
+        return insights.slice(0, 3);
     }
 }
 
