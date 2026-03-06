@@ -21,6 +21,7 @@ export const config = {
   // Panel Dashboard Admin Config
   ADMIN_API_KEY: process.env.ADMIN_API_KEY || 'super_secret_admin_key_123',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  ALLOWED_ORIGINS: (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://petcarestudio.vercel.app').split(','),
 
   // Rate Limiting Configuration
   RATE_LIMIT: {

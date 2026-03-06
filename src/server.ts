@@ -23,8 +23,21 @@ declare global {
 }
 
 // Middleware básico
-// Habilita peticiones cruzadas solo para el Dashboard autorizado
-app.use(cors({ origin: config.FRONTEND_URL }));
+// Habilita peticiones cruzadas (CORS) con lista blanca dinámica (Enterprise Ready)
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir peticiones sin 'origin' (como apps móviles o curl) 
+    // y comparar el origin con nuestra lista de dominios autorizados
+    if (!origin || config.ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS Error: Origin ${origin} not allowed by whitelist.`));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+}));
 app.use(
   express.json({
     verify: (req: any, res, buf) => {
