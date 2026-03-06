@@ -1,31 +1,45 @@
-const express = require('express');
-const config = require('./config');
-const webhookRoutes = require('./routes/webhook');
-const healthRoutes = require('./routes/health');
-const adminRoutes = require('./routes/admin'); // Rutas del panel
-const cors = require('cors');
-const logger = require('./utils/logger').default;
-const ConfigProvider = require('./core/config/ConfigProvider').default;
+import express from 'express';
+import config from './config';
+import webhookRoutes from './routes/webhook';
+import healthRoutes from './routes/health';
+import adminRoutes from './routes/admin'; // Rutas del panel
+import cors from 'cors';
+import logger from './utils/logger';
+import ConfigProvider from './core/config/ConfigProvider';
+import maintenanceService from './services/maintenanceService';
+import concurrencyQueue from './utils/ConcurrencyQueue';
 
 const app = express();
+
+/**
+ * Extensión de la interfaz Request para incluir rawBody
+ */
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: any;
+    }
+  }
+}
 
 // Middleware básico
 // Habilita peticiones cruzadas solo para el Dashboard autorizado
 app.use(cors({ origin: config.FRONTEND_URL }));
 app.use(
   express.json({
-    verify: (req, res, buf) => {
+    verify: (req: any, res, buf) => {
       req.rawBody = buf;
     },
   })
 );
+
 // Rutas
 app.use('/', healthRoutes);
 app.use('/webhook', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error Handler Global de Express (Captura errores sincrónicos/asincrónicos no detectados en rutas)
-app.use((err: any, req: any, res: any, next: any) => {
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error('Error no controlado en la aplicación HTTP:', { error: err.stack || err });
   res.status(500).json({ status: 'error', message: 'Error interno inesperado en el servidor.' });
 });
@@ -35,7 +49,6 @@ const startServer = async () => {
   await ConfigProvider.init();
 
   // Iniciar servicio de mantenimiento automático
-  const maintenanceService = require('./services/maintenanceService');
   maintenanceService.init();
 
   const server = app.listen(config.PORT, () => {
@@ -56,7 +69,6 @@ const startServer = async () => {
     });
 
     // 2. Esperar a que la cola de concurrencia de la IA termine sus procesos
-    const concurrencyQueue = require('./utils/ConcurrencyQueue').default;
     logger.info(`[SERVER] Esperando a que las tareas de la IA finalicen...`);
     await concurrencyQueue.waitForEmpty();
 
@@ -83,4 +95,5 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-module.exports = app;
+export default app;
+

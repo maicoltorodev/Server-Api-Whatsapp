@@ -1,15 +1,18 @@
-const supabase = require('../config/database');
-const leadModel = require('../models/leadModel');
-const conversationService = require('../services/conversationService');
-const systemEvents = require('../utils/eventEmitter');
-const logger = require('../utils/logger').default;
+import supabase from '../config/database';
+import leadModel from '../models/leadModel';
+import conversationService from '../services/conversationService';
+import systemEvents from '../utils/eventEmitter';
+import logger from '../utils/logger';
+import ConfigProvider from '../core/config/ConfigProvider';
+import aiService from '../services/aiService';
+import analyticsModel from '../models/analyticsModel';
 
-class AdminController {
+export class AdminController {
   /**
    * Obtiene la lista de Leads (Inbox)
    * Filtros aplicables vía query: bot_active (1, 0), current_step, etc.
    */
-  async getLeads(req, res) {
+  public async getLeads(req: any, res: any) {
     try {
       let query = supabase.from('leads').select('*').order('last_customer_message_at', { ascending: false });
 
@@ -34,7 +37,7 @@ class AdminController {
   /**
    * Trae el contexto e historial del chat de un cliente dado
    */
-  async getChatHistory(req, res) {
+  public async getChatHistory(req: any, res: any) {
     try {
       const { phone } = req.params;
       const { data: leadData, error: leadError } = await supabase
@@ -65,7 +68,7 @@ class AdminController {
   /**
    * Método que permite al DashBoard humano responder y por lo tanto bloquear la IA automáticamente
    */
-  async sendManualMessage(req, res) {
+  public async sendManualMessage(req: any, res: any) {
     try {
       const { phone, message } = req.body;
       if (!phone || !message) {
@@ -83,7 +86,7 @@ class AdminController {
   /**
    * Alternar estado de la IA para un lead (El botón de reactivar IA)
    */
-  async toggleBot(req, res) {
+  public async toggleBot(req: any, res: any) {
     try {
       const { phone } = req.params;
       const { active } = req.body;
@@ -105,7 +108,7 @@ class AdminController {
   /**
    * Marca un lead como revisado (Limpia el circulo rojo de pendiente)
    */
-  async markLeadAsReviewed(req, res) {
+  public async markLeadAsReviewed(req: any, res: any) {
     try {
       const { phone } = req.params;
       const result = await leadModel.clearReviewPending(phone);
@@ -123,9 +126,8 @@ class AdminController {
   /**
    * Invalida el cache del servidor para que la IA lea la nueva config de Supabase
    */
-  async refreshConfig(req, res) {
+  public async refreshConfig(req: any, res: any) {
     try {
-      const ConfigProvider = require('../core/config/ConfigProvider').default;
       await ConfigProvider.reload();
       res.json({ status: 'success', message: 'Configuración recargada exitosamente en RAM.' });
     } catch (error: any) {
@@ -137,7 +139,7 @@ class AdminController {
   /**
    * SSE Endpoint (Server-Sent Events para el Dashboard React/Vue)
    */
-  streamEvents(req, res) {
+  public streamEvents(req: any, res: any) {
     // Configura headers mandatorios de SSE Stream
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -145,11 +147,11 @@ class AdminController {
 
     res.write("data: {'message': 'Dashboard Sockets Connected'}\n\n"); // Conexión Inicial
 
-    const alertListener = (payload) => {
+    const alertListener = (payload: any) => {
       res.write(`event: notification\ndata: ${payload}\n\n`);
     };
 
-    const leadListener = (data) => {
+    const leadListener = (data: any) => {
       res.write(`event: lead_updated\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
@@ -167,7 +169,7 @@ class AdminController {
   /**
    * Obtiene la lista de leads que necesitan re-engagement
    */
-  async getColdLeads(req, res) {
+  public async getColdLeads(req: any, res: any) {
     try {
       const data = await leadModel.getColdLeads();
       res.json({ status: 'success', data });
@@ -180,7 +182,7 @@ class AdminController {
   /**
    * Genera un mensaje proactivo usando IA para un lead específico
    */
-  async generateProactiveMessage(req, res) {
+  public async generateProactiveMessage(req: any, res: any) {
     try {
       const { phone } = req.params;
       const lead = await leadModel.getByPhone(phone);
@@ -189,7 +191,6 @@ class AdminController {
         return res.status(404).json({ status: 'error', message: 'Lead no encontrado' });
       }
 
-      const aiService = require('../services/aiService');
       const hook = await aiService.generateProactiveHook(lead);
 
       res.json({ status: 'success', data: { hook } });
@@ -202,7 +203,7 @@ class AdminController {
   /**
    * Registra que se ha enviado un mensaje de re-engagement y actualiza la trazabilidad
    */
-  async recordReengagement(req, res) {
+  public async recordReengagement(req: any, res: any) {
     try {
       const { phone } = req.params;
       const lead = await leadModel.getByPhone(phone);
@@ -232,34 +233,23 @@ class AdminController {
   /**
    * Obtiene toda la data para el dashboard de Business Intelligence
    */
-  async getAnalyticsData(req, res) {
-    logger.info('[BI] Petición de analíticas recibida');
+  public async getAnalyticsData(req: any, res: any) {
     const startTime = Date.now();
+    const { range } = req.query;
+
+    logger.info('[BI] Petición de analíticas recibida', { range: range || '30 (default)' });
+
     try {
-      const analyticsModel = require('../models/analyticsModel');
+      const dashboardData = await analyticsModel.getFullDashboard(Number(range) || 30);
 
-      const [globalStats, serviceDistribution, heatmapData, petDemographics, iaEfficiency] = await Promise.all([
-        analyticsModel.getGlobalStats(),
-        analyticsModel.getServiceDistribution(),
-        analyticsModel.getHeatmapData(),
-        analyticsModel.getPetDemographics(),
-        analyticsModel.getIAEfficiency()
-      ]);
-
-      logger.info(`[BI] Analíticas generadas en ${Date.now() - startTime}ms`);
+      logger.info(`[BI] Dashboard generado en ${Date.now() - startTime}ms`);
       res.json({
         status: 'success',
-        data: {
-          globalStats,
-          serviceDistribution,
-          heatmapData,
-          petDemographics,
-          iaEfficiency
-        }
+        data: dashboardData
       });
     } catch (error: any) {
-      logger.error('[BI] Error obteniendo datos analíticos:', { error: error.stack || error });
-      res.status(500).json({ status: 'error', message: 'Error obteniendo datos analíticos' });
+      logger.error('[BI] Error en getAnalyticsData', { error: error.message });
+      res.status(500).json({ status: 'error', message: 'Error obteniendo analíticas' });
     }
   }
 
@@ -267,7 +257,7 @@ class AdminController {
    * RESET TOTAL DE DATOS DE PRUEBA (Danger Zone)
    * Borra Leads, Chats, Citas y Memorias de IA.
    */
-  async resetData(req, res) {
+  public async resetData(req: any, res: any) {
     try {
       logger.warn('INICIANDO RESET TOTAL DE DATOS SOLICITADO POR ADMIN');
 
@@ -291,7 +281,6 @@ class AdminController {
 
       // IMPORTANTE: Refrescar el cache de la IA para que olvide los contextos borrados
       logger.info('Refrescando caché de IA post-reset');
-      const ConfigProvider = require('../core/config/ConfigProvider').default;
       await ConfigProvider.reload();
 
       logger.info('Reset de datos completado exitosamente');
@@ -303,4 +292,5 @@ class AdminController {
   }
 }
 
-module.exports = new AdminController();
+export default new AdminController();
+

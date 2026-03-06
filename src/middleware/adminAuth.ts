@@ -1,7 +1,8 @@
-const config = require('../config');
+import config from '../config';
+import { Request, Response, NextFunction } from 'express';
 
 // Middleware para validar el acceso al Dashboard Administrativo
-function adminAuth(req, res, next) {
+export function adminAuth(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key;
 
   if (!apiKey || apiKey !== config.ADMIN_API_KEY) {
@@ -14,4 +15,5 @@ function adminAuth(req, res, next) {
   next();
 }
 
-module.exports = adminAuth;
+export default adminAuth;
+

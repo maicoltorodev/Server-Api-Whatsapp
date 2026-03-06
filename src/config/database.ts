@@ -1,6 +1,7 @@
-const { createClient } = require('@supabase/supabase-js');
-const config = require('./index');
+import { createClient } from '@supabase/supabase-js';
+import config from './index';
 
-const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
+const supabase = createClient(config.SUPABASE_URL!, config.SUPABASE_KEY!);
 
-module.exports = supabase;
+export default supabase;
+

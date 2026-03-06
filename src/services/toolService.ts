@@ -1,13 +1,13 @@
-const leadModel = require('../models/leadModel');
-const appointmentService = require('./appointmentService');
-const notificationService = require('./notificationService');
-const logger = require('../utils/logger').default;
+import leadModel from '../models/leadModel';
+import appointmentService from './appointmentService';
+import notificationService from './notificationService';
+import logger from '../utils/logger';
 
-class ToolService {
+export class ToolService {
   /**
    * Actualiza el perfil del lead basado en la conversación
    */
-  async update_lead_info(args, phone) {
+  public async update_lead_info(args: any, phone: string) {
     logger.info(`[TOOL] Executing: update_lead_info for ${phone}`, { args });
     try {
       if (Object.keys(args).length > 0) {
@@ -26,7 +26,7 @@ class ToolService {
   /**
    * Consulta disponibilidad de citas
    */
-  async check_availability(args) {
+  public async check_availability(args: any) {
     logger.info(`[TOOL] Executing: check_availability`, { args });
     const result = await appointmentService.checkAvailability(args);
     logger.info(`[TOOL] Result: Found ${result.available_slots?.length || 0} slots.`);
@@ -36,7 +36,7 @@ class ToolService {
   /**
    * Reserva una cita
    */
-  async book_appointment(args, phone) {
+  public async book_appointment(args: any, phone: string) {
     logger.info(`[TOOL] Executing: book_appointment for ${phone}`, { args });
     const leadData = await leadModel.getByPhone(phone);
     const result = await appointmentService.bookAppointment(phone, leadData, args);
@@ -59,7 +59,7 @@ class ToolService {
   /**
    * Cancela una cita
    */
-  async cancel_appointment(args, phone) {
+  public async cancel_appointment(args: any, phone: string) {
     logger.info(`[TOOL] Executing: cancel_appointment for ${phone}`, { args });
     const result = await appointmentService.cancelAppointment(phone, args);
     logger.info(`[TOOL] Result: ${result.status}`);
@@ -69,7 +69,7 @@ class ToolService {
   /**
    * Solicita intervención humana
    */
-  async transfer_to_human(args, phone) {
+  public async transfer_to_human(args: any, phone: string) {
     logger.warn(`[TOOL] EXECUTING: transfer_to_human for ${phone}`);
     const leadData = await leadModel.getByPhone(phone);
     await leadModel.deactivateBot(phone);
@@ -89,7 +89,7 @@ class ToolService {
   /**
    * Memoria a largo plazo - Guarda información permanente de la mascota
    */
-  async save_pet_preference(args, phone) {
+  public async save_pet_preference(args: any, phone: string) {
     logger.info(`[TOOL] EXECUTING: save_pet_preference for ${phone}`, { args });
     try {
       const { category, value, pet_name } = args;
@@ -106,4 +106,5 @@ class ToolService {
   }
 }
 
-module.exports = new ToolService();
+export default new ToolService();
+

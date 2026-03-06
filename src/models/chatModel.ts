@@ -1,11 +1,26 @@
-const supabase = require('../config/database');
-const logger = require('../utils/logger').default;
+import supabase from '../config/database';
+import logger from '../utils/logger';
 
-class ChatModel {
+export interface ChatMessage {
+  role: 'user' | 'model';
+  parts: Array<{
+    text?: string;
+    mediaUrl?: string;
+    mediaType?: 'image' | 'audio'
+  }>;
+}
+
+export interface Chat {
+  phone: string;
+  history: ChatMessage[];
+  updated_at: string;
+}
+
+export class ChatModel {
   /**
    * Obtiene el historial de chat de un número de teléfono
    */
-  async getHistory(phone) {
+  public async getHistory(phone: string): Promise<ChatMessage[]> {
     const { data, error } = await supabase
       .from('chats')
       .select('history')
@@ -24,14 +39,14 @@ class ChatModel {
   /**
    * Guarda el historial de chat
    */
-  async saveHistory(phone, history) {
+  public async saveHistory(phone: string, history: ChatMessage[]): Promise<Chat> {
     const { data, error } = await supabase
       .from('chats')
       .upsert(
         {
           phone: phone,
           history: history,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         },
         { onConflict: 'phone' }
       )
@@ -49,7 +64,7 @@ class ChatModel {
   /**
    * Agrega un mensaje al historial
    */
-  async addMessage(phone, message) {
+  public async addMessage(phone: string, message: ChatMessage): Promise<Chat> {
     const history = await this.getHistory(phone);
     history.push(message);
 
@@ -62,7 +77,7 @@ class ChatModel {
   /**
    * Limpia el historial de chat de un número
    */
-  async clearHistory(phone) {
+  public async clearHistory(phone: string): Promise<any> {
     const { data, error } = await supabase.from('chats').delete().eq('phone', phone);
 
     if (error) {
@@ -76,7 +91,7 @@ class ChatModel {
   /**
    * Obtiene todos los chats (para administración)
    */
-  async getAllChats() {
+  public async getAllChats(): Promise<any[]> {
     const { data, error } = await supabase
       .from('chats')
       .select('phone, updated_at')
@@ -87,8 +102,9 @@ class ChatModel {
       throw error;
     }
 
-    return data;
+    return data || [];
   }
 }
 
-module.exports = new ChatModel();
+export default new ChatModel();
+

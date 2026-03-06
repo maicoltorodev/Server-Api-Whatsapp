@@ -1,11 +1,11 @@
-const supabase = require('../config/database');
-const logger = require('../utils/logger').default;
+import supabase from '../config/database';
+import logger from '../utils/logger';
 
-class SystemLogModel {
+export class SystemLogModel {
     /**
      * Persiste un log directamente en la base de datos para auditoría o errores críticos
      */
-    async log(level: 'error' | 'warn' | 'info' | 'ERROR' | 'WARN' | 'INFO', message: string, phone: string | null = null, context: any = null, stack: string | null = null) {
+    public async log(level: 'error' | 'warn' | 'info' | 'ERROR' | 'WARN' | 'INFO', message: string, phone: string | null = null, context: any = null, stack: string | null = null) {
         const normalizedLevel = level.toUpperCase();
         const { error } = await supabase
             .from('system_logs')
@@ -26,7 +26,7 @@ class SystemLogModel {
     /**
      * Atajo para log de error persistente
      */
-    async logError(phone: string | null, message: string, errorObj: any) {
+    public async logError(phone: string | null, message: string, errorObj: any) {
         return this.log(
             'error',
             message,
@@ -37,4 +37,5 @@ class SystemLogModel {
     }
 }
 
-module.exports = new SystemLogModel();
+export default new SystemLogModel();
+

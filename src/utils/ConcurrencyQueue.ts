@@ -1,8 +1,8 @@
-const logger = require('./logger').default;
+import logger from './logger';
 
 type Task = () => Promise<void>;
 
-class ConcurrencyQueue {
+export class ConcurrencyQueue {
   private concurrency: number;
   private running: number;
   private queue: Task[];
@@ -60,7 +60,7 @@ class ConcurrencyQueue {
     return new Promise((resolve) => {
       const check = () => {
         if (this.running === 0 && this.queue.length === 0) {
-          resolve();
+          resolve(undefined);
         } else {
           setTimeout(check, 100);
         }
@@ -70,4 +70,5 @@ class ConcurrencyQueue {
   }
 }
 
-module.exports = new ConcurrencyQueue(3); // Solo permitimos 3 chats con IA procesándose al mismo tiempo
+export default new ConcurrencyQueue(3); // Solo permitimos 3 chats con IA procesándose al mismo tiempo
+

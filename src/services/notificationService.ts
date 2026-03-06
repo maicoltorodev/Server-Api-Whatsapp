@@ -1,9 +1,10 @@
-const config = require('../config');
-const systemEvents = require('../utils/eventEmitter');
-const logger = require('../utils/logger').default;
+import config from '../config';
+import systemEvents from '../utils/eventEmitter';
+import logger from '../utils/logger';
+import whatsappService from './whatsappService';
 
-class NotificationService {
-  async notifyOwner(clientPhone, clientName, message) {
+export class NotificationService {
+  public async notifyOwner(clientPhone: string, clientName: string, message: string) {
     const logContent = `AVISO AL SISTEMA: El cliente ${clientName} (${clientPhone}) necesita atención/tiene actividad.\nMensaje: "${message}"`;
     logger.warn(`---------- 🛎️ ALERTA PARA DASHBOARD ----------\n${logContent}`);
 
@@ -13,7 +14,7 @@ class NotificationService {
   /**
    * Notifica requerimiento urgente de humano
    */
-  async notifyHumanRequired(clientPhone, clientName, message) {
+  public async notifyHumanRequired(clientPhone: string, clientName: string, message: string) {
     const logContent = `URGENTE: El cliente ${clientName} (${clientPhone}) requiere intervención manual.\nMensaje: "${message}"\nEstado Bot: PAUSADO.`;
     logger.warn(`---------- 🛎️ REQUEST HUMANO (DASHBOARD) ----------\n${logContent}`);
 
@@ -32,7 +33,7 @@ class NotificationService {
   /**
    * Notifica al dueño sobre una nueva cita agendada
    */
-  async notifyNewAppointment(clientPhone, clientName, appointmentData) {
+  public async notifyNewAppointment(clientPhone: string, clientName: string, appointmentData: any) {
     const message = `🤖 ¡LA IA HA CERRADO UNA CITA!\n🗓️ ${appointmentData.date} a las ${appointmentData.start_time}\n🐶 ${appointmentData.pet_name || 'No dijo'}\n✂️ ${appointmentData.service}`;
 
     await this.notifyOwner(clientPhone, clientName, message);
@@ -41,7 +42,7 @@ class NotificationService {
   /**
    * Notifica al dueño sobre una cita cancelada
    */
-  async notifyCancelledAppointment(clientPhone, appointmentData) {
+  public async notifyCancelledAppointment(clientPhone: string, appointmentData: any) {
     const message = `⚠️ CITA CANCELADA AUTOMÁTICAMENTE\n🗓️ ${appointmentData.date} a las ${appointmentData.start_time.substring(0, 5)}`;
 
     await this.notifyOwner(clientPhone, 'Cliente', message);
@@ -50,7 +51,7 @@ class NotificationService {
   /**
    * Notifica error crítico al dueño
    */
-  async notifyCriticalError(clientPhone, errorMessage) {
+  public async notifyCriticalError(clientPhone: string, errorMessage: string) {
     logger.error(`ERROR CRÍTICO EN EL BOT (Cliente: ${clientPhone}): ${errorMessage}`);
     // Opcional: Enviar SMS al Admin
   }
@@ -58,9 +59,8 @@ class NotificationService {
   /**
    * Envía mensaje de error al cliente
    */
-  async notifyClientError(clientPhone) {
+  public async notifyClientError(clientPhone: string) {
     try {
-      const whatsappService = require('./whatsappService');
       await whatsappService.sendMessage(
         clientPhone,
         'Disculpa, estoy experimentando un pequeño problema técnico 😵‍💫. Un humano tomará mi lugar en breve para ayudarte.'
@@ -71,4 +71,5 @@ class NotificationService {
   }
 }
 
-module.exports = new NotificationService();
+export default new NotificationService();
+

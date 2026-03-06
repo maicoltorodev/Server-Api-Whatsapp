@@ -1,6 +1,7 @@
-require('dotenv').config();
+import dotenv from 'dotenv';
+dotenv.config();
 
-const config = {
+export const config = {
   // Server Configuration
   PORT: process.env.PORT || 3000,
 
@@ -31,4 +32,5 @@ const config = {
   TIMEZONE: 'America/Bogota',
 };
 
-module.exports = config;
+export default config;
+

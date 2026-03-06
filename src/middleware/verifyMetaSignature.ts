@@ -1,13 +1,14 @@
-const crypto = require('crypto');
-const config = require('../config');
-const logger = require('../utils/logger').default;
+import crypto from 'crypto';
+import config from '../config';
+import logger from '../utils/logger';
+import { Request, Response, NextFunction } from 'express';
 
 /**
  * Middleware para verificar la firma de Meta para seguridad del webhook.
  * Implementa validación estricta usando timingSafeEqual y logs estructurados.
  */
-function verifyMetaSignature(req, res, next) {
-  const signature = req.headers['x-hub-signature-256'];
+export function verifyMetaSignature(req: any, res: Response, next: NextFunction) {
+  const signature = req.headers['x-hub-signature-256'] as string;
 
   // 1. Validar presencia de la firma
   if (!signature) {
@@ -43,7 +44,7 @@ function verifyMetaSignature(req, res, next) {
 
   // 3. Calcular el hash con el APP SECRET de Meta
   const expectedHash = crypto
-    .createHmac('sha256', config.META_APP_SECRET)
+    .createHmac('sha256', config.META_APP_SECRET as string)
     .update(req.rawBody)
     .digest('hex');
 
@@ -84,4 +85,5 @@ function verifyMetaSignature(req, res, next) {
   next();
 }
 
-module.exports = verifyMetaSignature;
+export default verifyMetaSignature;
+

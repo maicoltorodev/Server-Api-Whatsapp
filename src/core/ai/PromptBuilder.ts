@@ -78,6 +78,17 @@ export class SystemPromptBuilder {
   }
 
   /**
+   * Instrucciones específicas para el manejo de archivos multimedia (Voz e Imagen)
+   */
+  public setMultimodalInstructions(): this {
+    this.parts.push(`📸 MULTIMEDIA:
+1. IMÁGENES: Eres capaz de ver fotos. Si te envían una con texto ilegible, papel arrugado o borrosa, menciona qué alcanzas a distinguir y pide una foto más clara si es vital.
+2. AUDIOS: Escuchas notas de voz. Si hay mucho ruido de fondo o no entiendes, pide amablemente que lo repitan.
+3. RECUERDA: La visión se vuelve conocimiento; una vez procesada la imagen, úsala para los agendamientos.`);
+    return this;
+  }
+
+  /**
    * Ensambla y retorna el sistema de instrucciones final
    */
   public build(): string {

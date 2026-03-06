@@ -1,11 +1,48 @@
-const supabase = require('../config/database');
-const logger = require('../utils/logger').default;
+import supabase from '../config/database';
+import logger from '../utils/logger';
 
-class LeadModel {
+// --- INTERFACES ---
+export interface PetInfo {
+  name: string;
+  breed?: string;
+  medical?: string[];
+  behavior?: string;
+  preferences?: string[];
+  notes?: string;
+}
+
+export interface LeadHistory {
+  pets: PetInfo[];
+}
+
+export interface Lead {
+  id: string;
+  phone: string;
+  name?: string;
+  status: string;
+  current_step: string;
+  summary?: string;
+  bot_active: boolean;
+  medical_history?: LeadHistory;
+  last_customer_message_at?: string;
+  last_reengagement_at?: string;
+  reengagement_count: number;
+  human_review_pending: boolean;
+  customer_mood?: string;
+  recent_media?: {
+    images: string[];
+    audios: string[];
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+
+export class LeadModel {
   /**
    * Obtiene un lead por su número de teléfono
    */
-  async getByPhone(phone) {
+  public async getByPhone(phone: string): Promise<Lead | null> {
     const { data, error } = await supabase.from('leads').select('*').eq('phone', phone).single();
 
     if (error && error.code !== 'PGRST116') {
@@ -20,7 +57,7 @@ class LeadModel {
   /**
    * Crea o actualiza un lead
    */
-  async upsert(leadData) {
+  public async upsert(leadData: Partial<Lead>): Promise<Lead> {
     const { data, error } = await supabase
       .from('leads')
       .upsert(leadData, { onConflict: 'phone' })
@@ -38,7 +75,7 @@ class LeadModel {
   /**
    * Actualiza el estado de un lead
    */
-  async updateStatus(phone, updates) {
+  public async updateStatus(phone: string, updates: Partial<Lead>): Promise<Lead> {
     const { data, error } = await supabase
       .from('leads')
       .update(updates)
@@ -57,28 +94,28 @@ class LeadModel {
   /**
    * Desactiva el bot para un lead
    */
-  async deactivateBot(phone) {
+  public async deactivateBot(phone: string): Promise<Lead> {
     return await this.updateStatus(phone, { bot_active: false, human_review_pending: true });
   }
 
   /**
    * Limpia el estado de pendiente de revisión
    */
-  async clearReviewPending(phone) {
+  public async clearReviewPending(phone: string): Promise<Lead> {
     return await this.updateStatus(phone, { human_review_pending: false });
   }
 
   /**
    * Activa el bot para un lead
    */
-  async activateBot(phone) {
+  public async activateBot(phone: string): Promise<Lead> {
     return await this.updateStatus(phone, { bot_active: true });
   }
 
   /**
    * Actualiza el paso actual del embudo
    */
-  async updateStep(phone, step) {
+  public async updateStep(phone: string, step: string): Promise<Lead> {
     return await this.updateStatus(phone, { current_step: step });
   }
 
@@ -87,14 +124,14 @@ class LeadModel {
    * Actualiza un fragmento específico del Historial Médico (Largo plazo)
    * Soporta múltiples mascotas por lead usando un arreglo de mascotas.
    */
-  async updateMedicalHistory(phone, category, value, petName) {
+  public async updateMedicalHistory(phone: string, category: string, value: any, petName: string): Promise<Lead> {
     const lead = await this.getByPhone(phone);
-    let history = lead?.medical_history || { pets: [] };
+    let history: LeadHistory = lead?.medical_history || { pets: [] };
 
     // Asegurar estructura de array de mascotas
     if (!history.pets) history.pets = [];
 
-    // Buscar la mascota por nombre (mactheo case insensitive)
+    // Buscar la mascota por nombre (match case insensitive)
     let pet = history.pets.find((p) => p.name?.toLowerCase() === petName?.toLowerCase());
 
     if (!pet) {
@@ -104,14 +141,14 @@ class LeadModel {
 
     // Si la categoría contiene un arreglo (ej: medical, preferences)
     if (['medical', 'preferences'].includes(category)) {
-      if (!pet[category]) pet[category] = [];
+      if (!(pet as any)[category]) (pet as any)[category] = [];
       // Agregar sin duplicar
-      if (!pet[category].includes(value)) {
-        pet[category].push(value);
+      if (!(pet as any)[category].includes(value)) {
+        (pet as any)[category].push(value);
       }
     } else {
       // Modificar directamente (behavior, notes)
-      pet[category] = value;
+      (pet as any)[category] = value;
     }
 
     return await this.updateStatus(phone, { medical_history: history });
@@ -121,7 +158,7 @@ class LeadModel {
    * Obtiene la lista de "Leads Fríos"
    * Criterios: Silencio > 4h y < 22h, sin cita agendada, no re-contactado hoy.
    */
-  async getColdLeads() {
+  public async getColdLeads(): Promise<Lead[]> {
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const twentyTwoHoursAgo = new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString();
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -141,8 +178,9 @@ class LeadModel {
       throw error;
     }
 
-    return data;
+    return data || [];
   }
 }
 
-module.exports = new LeadModel();
+export default new LeadModel();
+

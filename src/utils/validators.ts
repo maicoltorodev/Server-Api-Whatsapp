@@ -1,17 +1,17 @@
 /**
  * Funciones de validación para fechas, horas y otros datos
  */
-const DateUtils = require('./DateUtils').default;
+import DateUtils from './DateUtils';
 
-function isValidDate(dateStr) {
+export function isValidDate(dateStr: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
-function isValidTime(timeStr) {
+export function isValidTime(timeStr: string): boolean {
   return /^\d{2}:\d{2}$/.test(timeStr);
 }
 
-function isFutureDate(dateStr) {
+export function isFutureDate(dateStr: string): boolean {
   if (!isValidDate(dateStr)) return false;
 
   const bogotaZeroToday = DateUtils.getBogotaZeroToday();
@@ -20,7 +20,7 @@ function isFutureDate(dateStr) {
   return inputDate.getTime() >= bogotaZeroToday.getTime();
 }
 
-function isFutureDateTime(dateStr, timeStr) {
+export function isFutureDateTime(dateStr: string, timeStr: string): boolean {
   if (!isValidDate(dateStr) || !isValidTime(timeStr)) return false;
 
   const targetDate = DateUtils.createBogotaDate(dateStr, timeStr);
@@ -29,19 +29,19 @@ function isFutureDateTime(dateStr, timeStr) {
   return targetDate.getTime() > now.getTime();
 }
 
-function isWithinBusinessHours(startTime, endTime, businessStart = '09:00', businessEnd = '17:00') {
+export function isWithinBusinessHours(startTime: string, endTime: string, businessStart = '09:00', businessEnd = '17:00'): boolean {
   return startTime >= businessStart && endTime <= businessEnd;
 }
 
-function sanitizePhoneNumber(phone) {
+export function sanitizePhoneNumber(phone: string): string {
   return phone.replace(/\D/g, '');
 }
 
-function isValidWhatsAppMessage(message) {
+export function isValidWhatsAppMessage(message: any): boolean {
   return message && message.type === 'text' && message.text && message.text.body;
 }
 
-module.exports = {
+export default {
   isValidDate,
   isValidTime,
   isFutureDate,
@@ -50,3 +50,4 @@ module.exports = {
   sanitizePhoneNumber,
   isValidWhatsAppMessage,
 };
+

@@ -1,21 +1,21 @@
-const { genAI, tools } = require('../config/ai');
-const { HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
-const config = require('../config');
-const toolService = require('./toolService');
-const logger = require('../utils/logger').default;
-const ConfigProvider = require('../core/config/ConfigProvider').default;
-const systemLogModel = require('../models/systemLogModel');
-const { SystemPromptBuilder } = require('../core/ai/PromptBuilder');
-const appointmentService = require('./appointmentService');
+import { genAI, tools } from '../config/ai';
+import { HarmCategory, HarmBlockThreshold, GenerativeModel, ChatSession } from '@google/generative-ai';
+import config from '../config';
+import toolService from './toolService';
+import logger from '../utils/logger';
+import ConfigProvider from '../core/config/ConfigProvider';
+import systemLogModel from '../models/systemLogModel';
+import { SystemPromptBuilder } from '../core/ai/PromptBuilder';
+import appointmentService from './appointmentService';
 
-class AIService {
+export class AIService {
   constructor() { }
 
   /**
    * Inicializa el modelo usando la memoria RAM (Cero Queries)
    * Retorna una instancia de modelo configurada para este usuario/contexto.
    */
-  async initializeModel(leadData) {
+  public async initializeModel(leadData: any): Promise<GenerativeModel> {
     logger.info(`[IA] Inicializando instancia de modelo para ${leadData?.phone}...`);
 
     // Obtener configuración inmutable desde RAM
@@ -32,6 +32,7 @@ class AIService {
       .setCatalog(catalogArray)
       .setOperations(appConfig)
       .setActiveAppointments(activeAppts)
+      .setMultimodalInstructions()
       .setMasterInstructions(appConfig)
       .build();
 
@@ -56,7 +57,7 @@ class AIService {
 
     const modelObj = genAI.getGenerativeModel({
       model: 'gemini-flash-latest',
-      tools: [tools],
+      tools: [tools] as any,
       systemInstruction,
       safetySettings,
     });
@@ -70,14 +71,14 @@ class AIService {
   /**
    * Alias para inicialización rápida
    */
-  async prepareContext(leadData) {
+  public async prepareContext(leadData: any): Promise<GenerativeModel> {
     return await this.initializeModel(leadData);
   }
 
   /**
    * Genera un mensaje proactivo personalizado para un lead frío
    */
-  async generateProactiveHook(leadData) {
+  public async generateProactiveHook(leadData: any): Promise<string> {
     const { name, summary, medical_history, phone } = leadData;
     const history = medical_history as any;
     const petNames = history?.pets?.map((p: any) => p.name).join(', ') || 'su mascota';
@@ -111,7 +112,7 @@ class AIService {
     }
   }
 
-  _cleanupModelResponse(text) {
+  private _cleanupModelResponse(text: string): string {
     if (!text) return '';
     let cleaned = text.toString();
 
@@ -134,7 +135,7 @@ class AIService {
     return cleaned.replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  _filterSafetyFalsePositives(text) {
+  private _filterSafetyFalsePositives(text: string): string {
     if (!text) return text;
     // Evita falsos positivos críticos (Ej: mascotas llamadas "Loli")
     return text.toString()
@@ -143,27 +144,45 @@ class AIService {
   }
 
   /**
-   * Genera una respuesta manejando el historial de forma segura
+   * Genera una respuesta manejando el historial y posible contenido multimedia
    */
-  async generateResponse(model, message, history = []) {
+  public async generateResponse(model: GenerativeModel, message: string, history: any[] = [], media: any[] = []) {
     if (!model) throw new Error('IA no inicializada.');
 
     const safeMessage = this._filterSafetyFalsePositives(message);
     const sanitizedHistory = this._sanitizeHistory(history);
+
     logger.info(
-      `[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs):\n====================\n${JSON.stringify(sanitizedHistory, null, 2)}\n====================`
+      `[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs) y ${media.length} archivos media.`
     );
 
     const chatSession = model.startChat({
       history: sanitizedHistory,
     });
 
+    // Construcción del mensaje multimodal
+    const messageParts: any[] = [{ text: safeMessage }];
+
+    // Agregar media Items (Imágenes o Audios)
+    if (media && media.length > 0) {
+      media.forEach((item, index) => {
+        messageParts.push({
+          inlineData: {
+            data: item.data,
+            mimeType: item.mimeType
+          }
+        });
+        logger.info(`[IA - MULTIMODAL] Adjuntando archivo #${index + 1} (${item.mimeType})`);
+      });
+    }
+
     logger.info(
-      `[IA - PROCESANDO] Enviando prompt del usuario al modelo:\n====================\n${safeMessage}\n====================`
+      `[IA - PROCESANDO] Enviando prompt multimodal al modelo (Text: "${safeMessage.substring(0, 50)}...")`
     );
 
     const result = await this._withRetry(async () => {
-      return await chatSession.sendMessage(safeMessage);
+      // sendMessage puede recibir un array de partes para multimodalidad
+      return await chatSession.sendMessage(messageParts);
     });
 
     const usage = result?.response?.usageMetadata;
@@ -174,12 +193,6 @@ class AIService {
     }
 
     const calls = result.response.functionCalls();
-    if (calls && calls.length > 0) {
-      logger.info(`[IA] Gemini respondió con CALL: ${calls.map((c) => c.name).join(', ')}`);
-    } else {
-      logger.info(`[IA] Gemini respondió con TEXTO directamente.`);
-    }
-
     return {
       functionCalls: calls,
       text: this._cleanupModelResponse(result.response.text()),
@@ -190,7 +203,7 @@ class AIService {
   /**
    * Orquesta la ejecución de varias herramientas en bucle hasta obtener texto
    */
-  async processFunctionCalls(calls, chatSession, phone) {
+  public async processFunctionCalls(calls: any[], chatSession: ChatSession, phone: string) {
     let currentCalls = calls;
     let finalResponse = { text: '', chatSession };
 
@@ -204,7 +217,7 @@ class AIService {
         logger.info(`[TOOL] Executing: ${toolName} para ${phone}`);
 
         try {
-          const toolResult = await toolService[toolName](args, phone);
+          const toolResult = await (toolService as any)[toolName](args, phone);
           toolResponses.push({
             functionResponse: { name: toolName, response: toolResult },
           });
@@ -251,7 +264,7 @@ class AIService {
     return finalResponse;
   }
 
-  _sanitizeHistory(history) {
+  private _sanitizeHistory(history: any[]) {
     if (history.length === 0) return [];
 
     let sanitized = [...history];
@@ -349,4 +362,5 @@ class AIService {
   }
 }
 
-module.exports = new AIService();
+export default new AIService();
+

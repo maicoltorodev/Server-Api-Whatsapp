@@ -1,10 +1,10 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const config = require('./index');
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import config from './index';
 
-const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+export const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY!);
 
 // AI Tools Configuration
-const tools = {
+export const tools = {
   functionDeclarations: [
     {
       name: 'update_lead_info',
@@ -133,7 +133,3 @@ const tools = {
   ],
 };
 
-module.exports = {
-  genAI,
-  tools,
-};

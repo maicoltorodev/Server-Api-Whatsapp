@@ -1,13 +1,13 @@
-const express = require('express');
-const webhookController = require('../controllers/webhookController');
-const verifyMetaSignature = require('../middleware/verifyMetaSignature');
+import express from 'express';
+import webhookController from '../controllers/webhookController';
+import verifyMetaSignature from '../middleware/verifyMetaSignature';
 
 const router = express.Router();
 
 // Middleware para capturar el body raw (necesario para la verificación de firma)
 router.use(
   express.json({
-    verify: (req, res, buf) => {
+    verify: (req: any, res, buf) => {
       req.rawBody = buf.toString();
     },
   })
@@ -19,4 +19,5 @@ router.get('/', (req, res) => webhookController.verifyWebhook(req, res));
 // Ruta principal del webhook (POST) con verificación de firma
 router.post('/', verifyMetaSignature, (req, res) => webhookController.handleWebhook(req, res));
 
-module.exports = router;
+export default router;
+

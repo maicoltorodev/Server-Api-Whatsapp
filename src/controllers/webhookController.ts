@@ -1,17 +1,18 @@
-const whatsappService = require('../services/whatsappService');
-const conversationService = require('../services/conversationService');
-const leadModel = require('../models/leadModel');
-const notificationService = require('../services/notificationService');
-const rateLimiter = require('../middleware/rateLimit');
-const config = require('../config');
-const messageQueue = require('../utils/messageQueue');
-const logger = require('../utils/logger').default;
+import { Request, Response } from 'express';
+import whatsappService from '../services/whatsappService';
+import conversationService from '../services/conversationService';
+import leadModel from '../models/leadModel';
+import notificationService from '../services/notificationService';
+import rateLimiter from '../middleware/rateLimit';
+import config from '../config';
+import messageQueue from '../utils/messageQueue';
+import logger from '../utils/logger';
 
-class WebhookController {
+export class WebhookController {
   /**
    * Maneja el webhook principal de WhatsApp
    */
-  async handleWebhook(req, res) {
+  public async handleWebhook(req: Request, res: Response) {
     const body = req.body;
     res.sendStatus(200);
 
@@ -25,7 +26,7 @@ class WebhookController {
 
       logger.info('🟢 [WEBHOOK] --- NUEVO MENSAJE DE WHATSAPP DETECTADO ---');
 
-      const { id: msgId, from, text, isText } = message;
+      const { id: msgId, from, text, isText } = message as any;
       logger.info(`🔵 [MENSAJE NUEVO] Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
 
       // 2. Seguridad y Duplicados
@@ -36,37 +37,42 @@ class WebhookController {
       await whatsappService.markAsRead(msgId);
       logger.info(`Mensaje marcado como leído.`);
 
-      // 3. Validación de contenido
+      // 3. Procesar Contenido (Media o Texto)
       if (!isText) {
-        logger.warn('Contenido no es texto. Enviando mensaje de aviso.');
+        if (message.isMedia && message.mediaId) {
+          logger.info(`📸 [MEDIA DETECTADO] Descargando ${message.type} de ${from}...`);
+
+          const mediaUrl = await whatsappService.getMediaUrl(message.mediaId);
+          if (mediaUrl) {
+            const buffer = await whatsappService.downloadMedia(mediaUrl);
+            if (buffer) {
+              const base64Media = buffer.toString('base64');
+              const mediaContent = {
+                text: message.text || (message.type === 'audio' ? '[AUDIO]' : '[IMAGEN]'),
+                media: {
+                  data: base64Media,
+                  mimeType: message.mimeType
+                }
+              };
+
+              logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
+              messageQueue.enqueueMessage(from, mediaContent);
+              return;
+            }
+          }
+        }
+
+        logger.warn('Contenido no soportado o error en descarga. Enviando aviso.');
         await whatsappService.sendMessage(
           from,
-          '¡Hola! 🐾 Por ahora solo puedo procesar mensajes de texto. Si necesitas enviar fotos o audios, pide hablar con un humano.'
+          '¡Hola! 🐾 Por ahora solo puedo procesar mensajes de texto, fotos y audios. ¡No olvides pedir hablar con un humano si necesitas algo urgente!'
         );
         return;
       }
 
       logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
-
-      // 4. Rate Limiting (Spam)
-      if (rateLimiter.isUserSpamming(from)) {
-        logger.warn(`SPAM DETECTADO: ${from}.`);
-        if (rateLimiter.userMessageCount.get(from).length === config.RATE_LIMIT.MAX_MESSAGES + 1) {
-          await leadModel.deactivateBot(from);
-          await notificationService.notifyOwner(
-            from,
-            'Alerta Sistema',
-            '🚨 IA desactivada automáticamente por spam detectado.'
-          );
-          logger.warn('IA Desactivada preventivamente por spam.');
-        }
-        return;
-      }
-
-      // 5. Delegar a la Cola de Espera (Debounce de 3s)
-      logger.info(`Poniendo el mensaje en espera (Embudo Antispam de 3s)...`);
-      messageQueue.enqueueMessage(from, text);
-    } catch (error) {
+      messageQueue.enqueueMessage(from, { text });
+    } catch (error: any) {
       logger.error('Error crítico en WebhookController', { error });
       await this.handleCriticalError(req.body, error);
     }
@@ -75,7 +81,7 @@ class WebhookController {
   /**
    * Maneja errores críticos notificando al admin
    */
-  async handleCriticalError(body, error) {
+  public async handleCriticalError(body: any, error: any) {
     try {
       const fromNumber = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from;
       if (fromNumber) {
@@ -89,7 +95,7 @@ class WebhookController {
   /**
    * Verificación del webhook (Requerido por Meta en el setup)
    */
-  verifyWebhook(req, res) {
+  public verifyWebhook(req: Request, res: Response) {
     if (req.query['hub.verify_token'] === config.VERIFY_TOKEN) {
       res.send(req.query['hub.challenge']);
     } else {
@@ -98,4 +104,5 @@ class WebhookController {
   }
 }
 
-module.exports = new WebhookController();
+export default new WebhookController();
+

@@ -1,6 +1,6 @@
-const supabase = require('../../config/database');
-const logger = require('../../utils/logger').default;
-const systemLogModel = require('../../models/systemLogModel');
+import supabase from '../../config/database';
+import logger from '../../utils/logger';
+import systemLogModel from '../../models/systemLogModel';
 import { AppConfigSchema, IAppConfig, CatalogItemSchema, ICatalogItem } from '../../types';
 
 class ConfigProvider {
@@ -58,8 +58,8 @@ class ConfigProvider {
         ) {
           value = value
             .split(',')
-            .map((d) => Number(d.trim()))
-            .filter((n) => !isNaN(n));
+            .map((d: any) => Number(d.trim()))
+            .filter((n: any) => !isNaN(n));
         }
 
         rawConfig[key] = value;
@@ -99,7 +99,7 @@ class ConfigProvider {
       // Parse Catalog
       if (catalogRes.data) {
         this.catalog = catalogRes.data
-          .map((item) => {
+          .map((item: any) => {
             const parsed = CatalogItemSchema.safeParse(item);
             return parsed.success ? parsed.data : null;
           })
@@ -157,3 +157,4 @@ class ConfigProvider {
 }
 
 export default ConfigProvider.getInstance();
+

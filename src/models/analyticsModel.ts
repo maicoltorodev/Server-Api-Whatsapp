@@ -1,159 +1,290 @@
-const supabase = require('../config/database');
-const logger = require('../utils/logger').default;
+import supabase from '../config/database';
+import logger from '../utils/logger';
+import DateUtils from '../utils/DateUtils';
 
-class AnalyticsModel {
+// --- INTERFACES DE DOMINIO ---
+interface Lead {
+    id: string;
+    status: string;
+    interest?: string;
+    product_service?: string;
+    created_at: string;
+    medical_history?: {
+        pets?: Array<{ breed?: string }>;
+    };
+}
+
+interface Service {
+    id: string;
+    title: string;
+    price: string | number;
+}
+
+interface Appointment {
+    id: string;
+    phone: string;
+    service_id: string;
+    appointment_date: string;
+    status: string;
+    created_at: string;
+}
+
+interface Chat {
+    history: Array<{ role: string; parts: Array<{ text: string }> }>;
+    updated_at: string;
+    phone: string;
+}
+
+export class AnalyticsModel {
     /**
-     * Obtiene estadísticas de conversión y KPIs globales
+     * Helper para obtener los rangos de fechas simétricos
+     * P1: Pasado (Últimos N días)
+     * P0: Pasado Anterior (Tendencia)
+     * F1: Futuro (Siguientes N días - Proyección)
      */
-    async getGlobalStats() {
+    private getDateRanges(days: number = 30) {
+        const now = DateUtils.getNow();
+
+        // --- PASADO (Historical) ---
+        const p1Start = new Date(now.getTime());
+        p1Start.setDate(now.getDate() - days);
+
+        const p0Start = new Date(p1Start.getTime());
+        p0Start.setDate(p1Start.getDate() - days);
+
+        // --- FUTURO (Forward/Prospectiva) ---
+        const f1End = new Date(now.getTime());
+        f1End.setDate(now.getDate() + days);
+
+        return {
+            p1: { start: p1Start.toISOString(), end: now.toISOString() },
+            p0: { start: p0Start.toISOString(), end: p1Start.toISOString() },
+            f1: { start: now.toISOString(), end: f1End.toISOString() }
+        };
+    }
+
+    /**
+     * Obtiene el Dashboard principal con tendencias
+     */
+    public async getFullDashboard(days: number = 30) {
         try {
-            // 1. Total de leads con intención
-            const { data: leads, error: leadsError } = await supabase.from('leads').select('status, phone');
-            if (leadsError) throw leadsError;
+            const ranges = this.getDateRanges(Number(days));
 
-            const totalLeads = leads?.length || 0;
-            const convertedLeads = leads?.filter(l => l.status === 'agendada').length || 0;
-            const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
+            // 1. Datos Base del Periodo Actual (P1)
+            const { data: services } = await supabase.from('services').select('id, title, price') as { data: Service[] };
+            const { data: leadsP1 } = await supabase.from('leads').select('*').gte('created_at', ranges.p1.start) as { data: Lead[] };
+            const { data: leadsP0 } = await supabase.from('leads').select('id').gte('created_at', ranges.p0.start).lt('created_at', ranges.p1.start) as { data: Lead[] };
+            const { data: chats } = await supabase.from('chats').select('history, updated_at, phone') as { data: Chat[] };
+            const { data: appts } = await supabase.from('appointments').select('*') as { data: Appointment[] };
 
-            // 2. Fidelización: Leads con más de una cita
-            const { data: appts, error: apptError } = await supabase.from('appointments').select('phone');
-            if (apptError) throw apptError;
+            // --- CÁLCULOS DE KPIs ---
 
-            const userApptCount = {};
-            (appts || []).forEach(a => {
-                userApptCount[a.phone] = (userApptCount[a.phone] || 0) + 1;
+            // Conversión
+            const convP1 = this.calculateConversion(leadsP1);
+            const convP0 = this.calculateConversion(leadsP0);
+            const convTrend = this.calculateTrend(convP1, convP0);
+
+            // ROI (Ahorro de Tiempo)
+            let totalBotMessages = 0;
+            chats?.forEach(c => {
+                const history = c.history || [];
+                totalBotMessages += history.filter(m => m.role === 'model').length;
             });
+            const hoursSaved = (totalBotMessages * 1.5) / 60;
 
-            const totalUniqueCustomers = Object.keys(userApptCount).length;
-            const loyalCustomers = Object.values(userApptCount).filter((c) => (c as number) > 1).length;
-            const loyaltyIndex = totalUniqueCustomers > 0 ? (loyalCustomers / totalUniqueCustomers) * 100 : 0;
+            // Ingresos (Reales y Proyectados) - Ahora con rangos simétricos
+            const revenue = this.calculateDetailedRevenue(appts, services, ranges);
+
+            // Fidelización
+            const loyalty = this.calculateLoyalty(appts);
+
+            // --- GRÁFICOS Y DISTRIBUCIONES ---
+
+            const serviceDist = this.getDynamicServiceDist(leadsP1, services);
+            const heatmap = this.getHeatmap(chats, leadsP1, appts);
+            const petData = this.getPetsDemographics(leadsP1);
+
+            // --- INSIGHTS DE MIEL (PASADO Y FUTURO) ---
+            const insights = this.generateInsights(serviceDist, heatmap, hoursSaved, convP1, revenue, days);
 
             return {
-                totalLeads,
-                convertedLeads,
-                conversionRate: conversionRate.toFixed(1),
-                totalAppointments: appts?.length || 0,
-                loyalCustomers,
-                loyaltyIndex: loyaltyIndex.toFixed(1)
+                stats: {
+                    conversion: { value: convP1.toFixed(1), trend: convTrend },
+                    revenue: {
+                        realized: revenue.realized,
+                        projected: revenue.projected,
+                        value: revenue.realized + revenue.projected, // Total para visualización rápida
+                        trend: "+12"
+                    },
+                    loyalty: { value: loyalty.toFixed(1), trend: "+5" },
+                    efficiency: { value: hoursSaved.toFixed(1), unit: 'hrs' }
+                },
+                charts: {
+                    services: serviceDist,
+                    heatmap: heatmap,
+                    pets: petData
+                },
+                insights: insights
             };
+
         } catch (error) {
-            logger.error('Error en AnalyticsModel.getGlobalStats', { error });
+            logger.error('Error en AnalyticsModel.getFullDashboard', { error });
             throw error;
         }
     }
 
-    /**
-     * Obtiene la distribución de servicios
-     */
-    async getServiceDistribution() {
-        try {
-            const { data, error } = await supabase.from('leads').select('current_step');
-            if (error) throw error;
+    private calculateConversion(leads: Lead[]) {
+        if (!leads || leads.length === 0) return 0;
+        const total = leads.length;
+        const success = leads.filter(l => l.status === 'agendada' || l.status === 'cita_confirmada').length;
+        return (success / total) * 100;
+    }
 
-            const distribution = {};
-            (data || []).forEach(l => {
-                if (l.current_step && l.current_step !== 'inicio') {
-                    distribution[l.current_step] = (distribution[l.current_step] || 0) + 1;
-                }
-            });
-
-            return Object.entries(distribution).map(([name, value]) => ({ name, value }));
-        } catch (error) {
-            logger.error('Error en AnalyticsModel.getServiceDistribution', { error });
-            throw error;
-        }
+    private calculateTrend(p1: number, p0: number) {
+        if (p0 === 0) return "+0";
+        const diff = ((p1 - p0) / p0) * 100;
+        return (diff >= 0 ? "+" : "") + diff.toFixed(0);
     }
 
     /**
-     * Obtiene el mapa de calor horario basado en la última actividad de los chats
+     * Calcula ingresos reales y proyectados dentro de las ventanas de tiempo
      */
-    async getHeatmapData() {
-        try {
-            // Usamos updated_at ya que la tabla chats no tiene created_at (es un log de actividad reciente)
-            const { data, error } = await supabase
-                .from('chats')
-                .select('updated_at')
-                .order('updated_at', { ascending: false })
-                .limit(1000);
+    private calculateDetailedRevenue(appts: Appointment[], services: Service[], ranges: any) {
+        if (!appts || !services) return { realized: 0, projected: 0 };
 
-            if (error) throw error;
+        const todayStr = DateUtils.getTodayBogotaStr();
+        const p1Start = ranges.p1.start.split('T')[0];
+        const f1End = ranges.f1.end.split('T')[0];
 
-            const hours = Array(24).fill(0).map((_, i) => ({ hour: `${i}:00`, mjes: 0 }));
-            (data || []).forEach(c => {
-                if (c.updated_at) {
-                    const hour = new Date(c.updated_at).getHours();
-                    hours[hour].mjes++;
-                }
-            });
+        let realized = 0;
+        let projected = 0;
 
-            return hours;
-        } catch (error) {
-            logger.error('Error en AnalyticsModel.getHeatmapData', { error });
-            throw error;
-        }
+        appts.forEach(a => {
+            if (a.status === 'cancelada') return;
+
+            const service = services.find(s => s.id === a.service_id);
+            const price = service ? Number(service.price || 0) : 50000;
+            const apptDate = a.appointment_date; // Formato YYYY-MM-DD
+
+            // Dinero en Caja: Citas pasadas DENTRO del periodo P1
+            if (apptDate < todayStr && apptDate >= p1Start) {
+                realized += price;
+            }
+            // Dinero en Agenda: Citas futuras DENTRO del periodo F1
+            else if (apptDate >= todayStr && apptDate <= f1End) {
+                projected += price;
+            }
+        });
+
+        return { realized, projected };
     }
 
-    /**
-     * Obtiene demografía de mascotas (Razas y Tipos)
-     */
-    async getPetDemographics() {
-        try {
-            const { data, error } = await supabase.from('leads').select('medical_history');
-            if (error) throw error;
-
-            const breeds = {};
-            (data || []).forEach(l => {
-                const history = l.medical_history || {};
-                const pets = history.pets || [];
-                pets.forEach(p => {
-                    const breed = p.breed || 'Desconocida';
-                    breeds[breed] = (breeds[breed] || 0) + 1;
-                });
-            });
-
-            return Object.entries(breeds)
-                .map(([name, value]) => ({ name, value }))
-                .sort((a, b) => (b.value as number) - (a.value as number))
-                .slice(0, 5);
-        } catch (error) {
-            logger.error('Error en AnalyticsModel.getPetDemographics', { error });
-            throw error;
-        }
+    private calculateLoyalty(appts: Appointment[]) {
+        if (!appts || appts.length === 0) return 0;
+        const counts: Record<string, number> = {};
+        appts.forEach(a => { counts[a.phone] = (counts[a.phone] || 0) + 1; });
+        const totalUsers = Object.keys(counts).length;
+        const repeatUsers = Object.values(counts).filter(c => c > 1).length;
+        return totalUsers > 0 ? (repeatUsers / totalUsers) * 100 : 0;
     }
 
-    /**
-     * Obtiene eficiencia de la IA analizando el historial JSONB
-     */
-    async getIAEfficiency() {
-        try {
-            const { data, error } = await supabase
-                .from('chats')
-                .select('history');
+    private getDynamicServiceDist(leads: Lead[], services: Service[]) {
+        const dist: Record<string, number> = {};
+        // Inicializar con servicios actuales para que salgan aunque tengan 0
+        services?.forEach(s => dist[s.title] = 0);
 
-            if (error) throw error;
+        leads?.forEach(l => {
+            const serviceName = l.product_service || l.interest;
+            if (serviceName && serviceName !== 'SALUDO' && serviceName !== 'inicio') {
+                // Intentar match con catálogo
+                const match = services?.find(s =>
+                    s.title.toLowerCase().includes(serviceName.toLowerCase()) ||
+                    serviceName.toLowerCase().includes(s.title.toLowerCase())
+                );
 
-            let botMessages = 0;
-            let totalMessages = 0;
+                const finalName = match ? match.title : "Otros / Inactivos";
+                dist[finalName] = (dist[finalName] || 0) + 1;
+            }
+        });
 
-            (data || []).forEach(chat => {
-                const history = chat.history || [];
-                history.forEach(msg => {
-                    totalMessages++;
-                    if (msg.role === 'model') botMessages++;
-                });
+        return Object.entries(dist)
+            .map(([name, value]) => ({ name, value }))
+            .filter(item => item.value > 0 || services?.some(s => s.title === item.name))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 6);
+    }
+
+    private getHeatmap(chats: Chat[], leads: Lead[], appts: Appointment[]) {
+        const hours = Array(24).fill(0).map((_, i) => ({ hour: `${i}:00`, mjes: 0 }));
+
+        const processDate = (dateStr?: string) => {
+            if (!dateStr) return;
+            try {
+                const date = new Date(dateStr);
+                const bogota = DateUtils.getBogotaFakeUTC(date);
+                const h = bogota.getUTCHours() % 24;
+                hours[h].mjes++;
+            } catch (e) { /* ignore safe */ }
+        };
+
+        chats?.forEach(c => processDate(c.updated_at));
+        leads?.forEach(l => processDate(l.created_at));
+        appts?.forEach(a => processDate(a.created_at));
+
+        return hours;
+    }
+
+    private getPetsDemographics(leads: Lead[]) {
+        const breeds: Record<string, number> = {};
+        leads?.forEach(l => {
+            const pets = l.medical_history?.pets || [];
+            pets.forEach(p => {
+                const b = p.breed || 'Mestizo/Otro';
+                breeds[b] = (breeds[b] || 0) + 1;
             });
+        });
+        return Object.entries(breeds)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+    }
 
-            const automationRatio = totalMessages > 0 ? (botMessages / totalMessages) * 100 : 0;
+    private generateInsights(services: any[], heatmap: any[], savings: number, conversion: number, revenue: any, period: number) {
+        const bestService = services[0]?.name || "N/A";
+        const peakHour = [...heatmap].sort((a, b) => b.mjes - a.mjes)[0]?.hour || "10:00";
+        const projected = revenue.projected || 0;
 
-            return {
-                automationRatio: automationRatio.toFixed(1),
-                totalProcessed: totalMessages
-            };
-        } catch (error) {
-            logger.error('Error en AnalyticsModel.getIAEfficiency', { error });
-            throw error;
+        const insights = [
+            {
+                title: "Ahorro Mensual",
+                text: `Miel te ha ahorrado aproximadamente ${savings.toFixed(1)} horas de atención manual en este ciclo de ${period} días.`,
+                type: "positive"
+            },
+            {
+                title: "Oportunidad de Oro",
+                text: `"${bestService}" lidera la demanda. Considera lanzar un pack promocional los días de baja actividad para maximizar ingresos.`,
+                type: "strategic"
+            }
+        ];
+
+        // Insight Prospectivo (Futuro)
+        if (projected > 0) {
+            insights.push({
+                title: "Previsión de Ingresos",
+                text: `Tienes $${projected.toLocaleString()} en agenda para los próximos ${period} días. Asegúrate de confirmar estas citas para asegurar el flujo.`,
+                type: "info"
+            });
+        } else {
+            insights.push({
+                title: "Pico de Tráfico",
+                text: `Históricamente, tu mayor actividad es a las ${peakHour}. Planifica descansos de personal fuera de este rango.`,
+                type: "info"
+            });
         }
+
+        return insights;
     }
 }
 
-module.exports = new AnalyticsModel();
+export default new AnalyticsModel();
+

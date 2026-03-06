@@ -1,8 +1,8 @@
-const config = require('../config');
+import config from '../config';
 
 class RateLimiter {
-  processedMessages: Set<any>;
-  userMessageCount: Map<any, any>;
+  public processedMessages: Set<any>;
+  public userMessageCount: Map<any, any>;
 
   constructor() {
     this.processedMessages = new Set();
@@ -14,7 +14,7 @@ class RateLimiter {
 
       // 1. Limpieza Lazy de los contadores abusivos
       for (const [phone, stamps] of this.userMessageCount.entries()) {
-        const validStamps = stamps.filter((t) => now - t < config.RATE_LIMIT.WINDOW_MS);
+        const validStamps = (stamps as Array<number>).filter((t) => now - t < config.RATE_LIMIT.WINDOW_MS);
         if (validStamps.length === 0) {
           this.userMessageCount.delete(phone);
         } else {
@@ -32,7 +32,7 @@ class RateLimiter {
   /**
    * Verifica si un mensaje ya fue procesado (previene duplicados)
    */
-  isMessageProcessed(msgId) {
+  public isMessageProcessed(msgId: string) {
     if (this.processedMessages.has(msgId)) {
       return true;
     }
@@ -43,13 +43,13 @@ class RateLimiter {
   /**
    * Verifica si un usuario excede el límite de mensajes (anti-spam)
    */
-  isUserSpamming(userPhone) {
+  public isUserSpamming(userPhone: string) {
     const now = Date.now();
     let userTimestamps = this.userMessageCount.get(userPhone) || [];
 
     // Filtramos solo los mensajes recibidos en la ventana de tiempo
     userTimestamps = userTimestamps.filter(
-      (timestamp) => now - timestamp < config.RATE_LIMIT.WINDOW_MS
+      (timestamp: number) => now - timestamp < config.RATE_LIMIT.WINDOW_MS
     );
     userTimestamps.push(now);
     this.userMessageCount.set(userPhone, userTimestamps);
@@ -58,4 +58,5 @@ class RateLimiter {
   }
 }
 
-module.exports = new RateLimiter();
+export default new RateLimiter();
+

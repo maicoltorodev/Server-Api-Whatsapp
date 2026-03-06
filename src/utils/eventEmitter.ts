@@ -1,3 +1,8 @@
-const EventEmitter = require('events');
-class SystemEventEmitter extends EventEmitter {}
-module.exports = new SystemEventEmitter();
+import { EventEmitter } from 'events';
+
+class SystemEventEmitter extends EventEmitter { }
+
+const systemEvents = new SystemEventEmitter();
+
+export default systemEvents;
+

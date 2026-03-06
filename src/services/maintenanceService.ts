@@ -1,24 +1,26 @@
-const supabase = require('../config/database');
-const logger = require('../utils/logger').default;
-const DateUtils = require('../utils/DateUtils').default;
+import supabase from '../config/database';
+import logger from '../utils/logger';
+import DateUtils from '../utils/DateUtils';
 
-class MaintenanceService {
+export class MaintenanceService {
     /**
      * Ejecuta tareas de limpieza y actualización de estados
      */
-    async runDailyMaintenance() {
+    public async runDailyMaintenance() {
         logger.info('--- 🧹 INICIANDO MANTENIMIENTO DIARIO DEL SISTEMA ---');
         try {
             const today = DateUtils.getTodayBogotaStr();
 
-            // Calculamos fechas límite
-            const yesterdayDate = new Date();
-            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-            const limitValidation = yesterdayDate.toISOString().split('T')[0];
+            // Calculamos fechas límite usando la zona horaria de Bogotá (no UTC del servidor)
+            // getBogotaFakeUTC() retorna un Date donde los métodos .getUTC*() equivalen a hora Colombia
+            const bogotaFake = DateUtils.getBogotaFakeUTC();
 
-            const oneMonthAgo = new Date();
-            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-            const limitPurge = oneMonthAgo.toISOString().split('T')[0];
+            const yesterdayBogota = new Date(bogotaFake.getTime() - 24 * 60 * 60 * 1000);
+            const limitValidation = yesterdayBogota.toISOString().split('T')[0];
+
+            const oneMonthAgoBogota = new Date(bogotaFake);
+            oneMonthAgoBogota.setUTCMonth(oneMonthAgoBogota.getUTCMonth() - 1);
+            const limitPurge = oneMonthAgoBogota.toISOString().split('T')[0];
 
             // 1. VALIDACIÓN DE MÉTRICAS (1 día después de la fecha de la cita)
             // Solo procesamos las que NO han sido validadas y cuya fecha ya pasó (al menos 1 día)
@@ -79,7 +81,7 @@ class MaintenanceService {
      * Motor de Programación: Calcula el tiempo hasta la próxima medianoche
      * para ejecutar el mantenimiento exactamente al inicio del nuevo día.
      */
-    init() {
+    public init() {
         // 1. Ejecución inmediata al arrancar (Catch-up)
         logger.info('Motor de mantenimiento iniciado. Ejecutando catch-up inicial...');
         this.runDailyMaintenance();
@@ -135,4 +137,5 @@ class MaintenanceService {
     }
 }
 
-module.exports = new MaintenanceService();
+export default new MaintenanceService();
+

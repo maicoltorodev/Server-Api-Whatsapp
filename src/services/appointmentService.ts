@@ -1,23 +1,22 @@
-const supabase = require('../config/database');
-const ConfigProvider = require('../core/config/ConfigProvider').default;
-const {
+import supabase from '../config/database';
+import ConfigProvider from '../core/config/ConfigProvider';
+import {
   isValidDate,
   isValidTime,
   isFutureDate,
   isFutureDateTime,
-  isWithinBusinessHours,
-} = require('../utils/validators');
-const notificationService = require('./notificationService');
-const config = require('../config');
-const logger = require('../utils/logger').default;
-const DateUtils = require('../utils/DateUtils').default;
-const systemLogModel = require('../models/systemLogModel');
+} from '../utils/validators';
+import notificationService from './notificationService';
+import config from '../config';
+import logger from '../utils/logger';
+import DateUtils from '../utils/DateUtils';
+import systemLogModel from '../models/systemLogModel';
 
-class AppointmentService {
+export class AppointmentService {
   /**
    * Verifica disponibilidad para una fecha específica
    */
-  async checkAvailability({ date, time, duration_minutes = 60 }) {
+  public async checkAvailability({ date, time, duration_minutes = 60 }: { date: string, time?: string, duration_minutes?: number }) {
     // Validaciones básicas
     if (!isValidDate(date)) {
       return {
@@ -85,11 +84,11 @@ class AppointmentService {
   /**
    * Genera slots de tiempo disponibles evaluando la duración completa
    */
-  generateAvailableSlots(date, config, existingAppointments, durationMinutes) {
+  private generateAvailableSlots(date: string, config: any, existingAppointments: any[], durationMinutes: number) {
     const libres = [];
     let currentSlot = DateUtils.createBogotaDate(date, config.open);
     const closingTime = DateUtils.createBogotaDate(date, config.close);
-    const duration = parseInt(durationMinutes) || config.defaultDuration || 60;
+    const duration = parseInt(durationMinutes as any) || config.defaultDuration || 60;
 
     const nowBogotaStr = DateUtils.getTodayBogotaStr();
     const now = DateUtils.getNow();
@@ -146,10 +145,10 @@ class AppointmentService {
   /**
    * Agenda una nueva cita
    */
-  async bookAppointment(
-    phone,
-    leadData,
-    { customer_name, service, pet_name, date, start_time, duration_minutes }
+  public async bookAppointment(
+    phone: string,
+    leadData: any,
+    { customer_name, service, pet_name, date, start_time, duration_minutes }: any
   ) {
     // Validaciones
     if (!isValidDate(date) || !isValidTime(start_time)) {
@@ -227,7 +226,7 @@ class AppointmentService {
       }
 
       // Reemplazamos la duración que envió la IA por la real en BD
-      finalDuration = parseInt(serviceFound.duration_minutes) || 60;
+      finalDuration = parseInt(serviceFound.duration_minutes as any) || 60;
       // Sanitizamos el nombre del texto a guardar
       finalService = serviceFound.title;
     }
@@ -251,7 +250,7 @@ class AppointmentService {
 
     try {
       // Verificar disponibilidad real usando la duración final
-      const availabilityCheck = await this.checkAvailability({
+      const availabilityCheck: any = await this.checkAvailability({
         date,
         time: start_time,
         duration_minutes: finalDuration,
@@ -275,7 +274,7 @@ class AppointmentService {
         p_date: date,
         p_start_time: start_time,
         p_end_time: end_time,
-        p_service_notes: `Agendado por IA. Servicio solicitado: ${finalService}`,
+        p_service_notes: `Servicio solicitado: ${finalService}`,
         p_concurrency_limit: agendaConfig.concurrency,
         p_buffer_minutes: agendaConfig.buffer,
         p_closing_time: agendaConfig.close + ':00',
@@ -336,7 +335,7 @@ class AppointmentService {
   /**
    * Cancela una cita existente
    */
-  async cancelAppointment(phone, { date, start_time }) {
+  public async cancelAppointment(phone: string, { date, start_time }: { date: string, start_time: string }) {
     if (!isValidDate(date)) {
       return {
         status: 'error',
@@ -383,7 +382,7 @@ class AppointmentService {
         .from('appointments')
         .update({
           status: 'cancelada',
-          notes: `${appointment.notes || ''} | Cancelada por el usuario via IA.`,
+          notes: `${appointment.notes || ''} | Cancelada por el usuario.`.trim(),
         })
         .eq('id', appointment.id);
 
@@ -423,7 +422,7 @@ class AppointmentService {
   /**
    * Obtiene citas para un día específico (para recordatorios)
    */
-  async getAppointmentsForDay(date) {
+  public async getAppointmentsForDay(date: string) {
     const { data, error } = await supabase
       .from('appointments')
       .select('id, phone, pet_name, start_time')
@@ -440,7 +439,7 @@ class AppointmentService {
   /**
    * Obtiene todas las citas activas (futuras) de un lead por su teléfono
    */
-  async getActiveAppointmentsByPhone(phone) {
+  public async getActiveAppointmentsByPhone(phone: string) {
     const nowBogota = DateUtils.getTodayBogotaStr();
 
     const { data, error } = await supabase
@@ -465,4 +464,5 @@ class AppointmentService {
   }
 }
 
-module.exports = new AppointmentService();
+export default new AppointmentService();
+
