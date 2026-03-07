@@ -77,12 +77,13 @@ export class ConversationService {
     }
     // logger.info(`  ↳ Bot ACTIVO. El Agente Inteligente tomará el caso.`);
 
-    // 4. Activar Indicador de Escritura (Typing...)
+    // 4. Activar Indicador de Escritura (Typing...) y marcar tiempo
+    const typingStartedAt = Date.now();
     await whatsappService.sendTypingIndicator(phone, lastMsgId);
 
     // 5. Procesar con IA
     // logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);
-    return await this.processWithAI(phone, message, leadData, pastHistory, media, startTime);
+    return await this.processWithAI(phone, message, leadData, pastHistory, media, startTime, typingStartedAt);
   }
 
   /**
@@ -99,7 +100,7 @@ export class ConversationService {
   /**
    * Orquestación del flujo de IA (Multimodal)
    */
-  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = [], startTime?: number) {
+  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = [], startTime?: number, typingStartedAt?: number) {
     try {
       // A. Preparar contexto e historial
       // logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
@@ -178,10 +179,18 @@ export class ConversationService {
       logger.info(`Guardando la respuesta de la IA en el historial...`);
       await chatModel.addMessage(phone, { role: 'model', parts: [{ text: responseText }] });
 
-      // H. Simular realismo (Typing delay)
-      const typingTime = Math.min(2000 + responseText.length * 20, 10000); // Entre 2s y 10s
-      logger.info(`[REALISMO] Simulando escritura por ${typingTime}ms...`);
-      await new Promise(resolve => setTimeout(resolve, typingTime));
+      // H. Simular realismo (Typing delay inteligente)
+      // El typing debe "acompañar" el proceso, no bloquearlo extra si ya pasó suficiente tiempo.
+      const targetTypingDuration = Math.min(1500 + responseText.length * 15, 6000); // Más agresivo: 1.5s - 6s
+      const elapsedSinceTyping = typingStartedAt ? Date.now() - typingStartedAt : 0;
+      const remainingTypingTime = Math.max(0, targetTypingDuration - elapsedSinceTyping);
+
+      if (remainingTypingTime > 0) {
+        logger.info(`[REALISMO] Completando ráfaga de escritura por ${remainingTypingTime}ms (IA fue muy rápida)...`);
+        await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
+      } else {
+        logger.info(`[REALISMO] Sin espera extra. El procesamiento de IA (${elapsedSinceTyping}ms) cubrió el tiempo de escritura.`);
+      }
 
       // I. Enviar al cliente
       logger.info(`[PASO 5] Entregando la respuesta de Miel a WhatsApp...`);
