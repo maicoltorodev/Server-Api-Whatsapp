@@ -66,23 +66,30 @@ export class AIService {
 
     // Auditoría de Tokens detallada (Medición Aislada para precisión)
     try {
-      // Usamos un modelo "limpio" para contar partes sin heredar el systemInstruction
       const counterModel = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
       const keys = Object.keys(components);
 
-      const [tokenCounts, totalResult] = await Promise.all([
+      // 1. Medir componentes de texto y el total integrado del modelo (Prompt + Tools)
+      const [tokenCounts, totalTextResult, totalModelResult] = await Promise.all([
         Promise.all(keys.map(k => counterModel.countTokens(components[k]))),
-        modelObj.countTokens("") // Peso real del systemInstruction en el modelo principal
+        counterModel.countTokens(systemInstruction),
+        modelObj.countTokens("") // Peso total en el modelo (SystemInstruction + TOOLS)
       ]);
 
-      const totalTokens = totalResult.totalTokens;
+      const totalTokens = totalModelResult.totalTokens;
       logger.info(`📊 [IA - TOKENS] Desglose del System Prompt (${totalTokens} tokens total):`);
 
+      // 2. Mostrar componentes del PromptBuilder
       keys.forEach((key, i) => {
         const tokens = tokenCounts[i].totalTokens;
         const percentage = totalTokens > 0 ? ((tokens / totalTokens) * 100).toFixed(1) : "0";
         logger.info(`   ↳ ${key.padEnd(6)} | ${tokens.toString().padStart(4)} tkn | ${percentage}%`);
       });
+
+      // 3. Calcular y mostrar peso de TOOLS por diferencia
+      const toolTokens = Math.max(0, totalTokens - totalTextResult.totalTokens);
+      const toolPercentage = totalTokens > 0 ? ((toolTokens / totalTokens) * 100).toFixed(1) : "0";
+      logger.info(`   ↳ TOOLS  | ${toolTokens.toString().padStart(4)} tkn | ${toolPercentage}%`);
 
       if (totalTokens > 8000) {
         logger.warn(`⚠️ [IA - OPTIMIZACIÓN] El System Prompt es pesado (${totalTokens} tkn). Se recomienda revisión.`);
@@ -207,6 +214,21 @@ export class AIService {
     ); */
 
     const iaCallStart = Date.now();
+
+    // Auditoría de Tokens de Entrada Dinámica (Costo de ejecución)
+    try {
+      const historyTokens = (await model.countTokens({ contents: sanitizedHistory })).totalTokens;
+      const mediaTokens = media.length > 0 ? (await model.countTokens({ contents: [{ role: 'user', parts: messageParts.filter(p => p.inlineData) }] })).totalTokens : 0;
+      const systemResult = await model.countTokens(""); // System + Tools
+
+      logger.info(`🔌 [IA - FLUJO ENTRADA] Desglose de carga para este mensaje:`);
+      logger.info(`   ↳ MANUAL (Fijo)   | ${systemResult.totalTokens.toString().padStart(4)} tkn`);
+      logger.info(`   ↳ MEMORIA (Hist)  | ${historyTokens.toString().padStart(4)} tkn`);
+      if (mediaTokens > 0) logger.info(`   ↳ MULTIMEDIA     | ${mediaTokens.toString().padStart(4)} tkn`);
+    } catch (err) {
+      // Silencioso para no interrumpir el flujo si falla el conteo
+    }
+
     const result = await this._withRetry(async () => {
       // sendMessage puede recibir un array de partes para multimodalidad
       return await chatSession.sendMessage(messageParts);
@@ -220,7 +242,7 @@ export class AIService {
       const totalCost = (promptCost + candidatesCost).toFixed(5);
 
       logger.success(
-        `💰 [TOKENS] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD | Duración: ${iaDuration}s`
+        `💰 [COSTO TOTAL] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Total: $${totalCost} USD | ${iaDuration}s`
       );
     }
 
