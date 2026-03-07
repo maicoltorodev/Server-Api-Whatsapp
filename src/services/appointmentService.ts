@@ -16,7 +16,9 @@ export class AppointmentService {
   /**
    * Verifica disponibilidad para una fecha específica
    */
-  public async checkAvailability({ date, time, duration_minutes = 60 }: { date: string, time?: string, duration_minutes?: number }) {
+  public async checkAvailability(args: { date: string, time?: string, duration?: number, duration_minutes?: number }) {
+    const { date, time } = args;
+    const duration_minutes = args.duration || args.duration_minutes || 60;
     // Validaciones básicas
     if (!isValidDate(date)) {
       return {
@@ -148,8 +150,10 @@ export class AppointmentService {
   public async bookAppointment(
     phone: string,
     leadData: any,
-    { customer_name, service, pet_name, date, start_time, duration_minutes }: any
+    args: any
   ) {
+    const { customer_name, service, pet_name, date, start_time } = args;
+    const duration_minutes = args.duration || args.duration_minutes || 60;
     // Validaciones
     if (!isValidDate(date) || !isValidTime(start_time)) {
       return {
