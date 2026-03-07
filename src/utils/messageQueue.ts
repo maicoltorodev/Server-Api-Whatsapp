@@ -19,11 +19,12 @@ export class MessageQueue {
    * Si llegan múltiples mensajes del mismo número antes de que se acabe el reloj,
    * se agrupan en un solo bloque y se reinicia el reloj.
    */
-  public enqueueMessage(from: string, content: { text?: string; media?: { data: string; mimeType: string } }, lastMsgId?: string) {
+  public enqueueMessage(from: string, content: { text?: string; media?: { data: string; mimeType: string } }, lastMsgId?: string, startTime?: number) {
     if (this.queues.has(from)) {
       const userQueue = this.queues.get(from);
       userQueue.contents.push(content);
       if (lastMsgId) userQueue.lastMsgId = lastMsgId;
+      // Mantenemos el startTime original del primer mensaje de la ráfaga
       clearTimeout(userQueue.timer);
 
       /* logger.info(
@@ -37,7 +38,8 @@ export class MessageQueue {
       this.queues.set(from, {
         contents: [content],
         timer: timer,
-        lastMsgId: lastMsgId
+        lastMsgId: lastMsgId,
+        startTime: startTime || Date.now()
       });
     }
   }
@@ -57,8 +59,10 @@ export class MessageQueue {
     if (!userQueue) return;
 
     this.processingPhones.add(from);
-    const { contents, lastMsgId } = userQueue;
+    const { contents, lastMsgId, startTime } = userQueue;
     this.queues.delete(from);
+
+    // ... rest of the method uses contents and lastMsgId ...
 
     // Combinar textos y recolectar media
     const texts: string[] = [];
@@ -77,7 +81,7 @@ export class MessageQueue {
 
     concurrencyQueue.enqueue(async () => {
       try {
-        await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId);
+        await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId, startTime);
       } catch (error: any) {
         logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
       } finally {

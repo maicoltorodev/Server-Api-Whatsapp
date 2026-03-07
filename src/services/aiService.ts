@@ -180,10 +180,12 @@ export class AIService {
       `[IA - PROCESANDO] Enviando prompt multimodal al modelo (Text: "${safeMessage.substring(0, 50)}...")`
     ); */
 
+    const iaCallStart = Date.now();
     const result = await this._withRetry(async () => {
       // sendMessage puede recibir un array de partes para multimodalidad
       return await chatSession.sendMessage(messageParts);
     });
+    const iaDuration = ((Date.now() - iaCallStart) / 1000).toFixed(2);
 
     const usage = result?.response?.usageMetadata;
     if (usage) {
@@ -192,7 +194,7 @@ export class AIService {
       const totalCost = (promptCost + candidatesCost).toFixed(5);
 
       logger.success(
-        `💰 [TOKENS] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD`
+        `💰 [TOKENS] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD | Duración: ${iaDuration}s`
       );
     }
 
@@ -244,9 +246,11 @@ export class AIService {
       }
 
       // Enviar todos los resultados de una vez con reintentos
+      const toolIaCallStart = Date.now();
       const result = await this._withRetry(async () => {
         return await chatSession.sendMessage(toolResponses);
       });
+      const toolIaDuration = ((Date.now() - toolIaCallStart) / 1000).toFixed(2);
 
       const usage = result.response.usageMetadata;
       if (usage) {
@@ -255,7 +259,7 @@ export class AIService {
         const totalCost = (promptCost + candidatesCost).toFixed(5);
 
         logger.success(
-          `💰 [TOKENS TOOL] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD`
+          `💰 [TOKENS TOOL] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD | Duración: ${toolIaDuration}s`
         );
       }
 

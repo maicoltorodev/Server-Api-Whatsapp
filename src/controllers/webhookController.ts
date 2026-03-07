@@ -17,6 +17,7 @@ export class WebhookController {
     res.sendStatus(200);
 
     try {
+      const startTime = Date.now();
       // 1. Extraer mensaje de los metadatos
       const message = whatsappService.extractMessageFromWebhook(body);
       if (!message) {
@@ -56,7 +57,7 @@ export class WebhookController {
               };
 
               // logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
-              messageQueue.enqueueMessage(from, mediaContent, message.id);
+              messageQueue.enqueueMessage(from, mediaContent, message.id, startTime);
               return;
             }
           }
@@ -67,7 +68,7 @@ export class WebhookController {
       }
 
       // logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
-      messageQueue.enqueueMessage(from, { text }, msgId);
+      messageQueue.enqueueMessage(from, { text }, msgId, startTime);
     } catch (error: any) {
       logger.error('Error crítico en WebhookController', { error });
       await this.handleCriticalError(req.body, error);

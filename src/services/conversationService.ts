@@ -13,7 +13,7 @@ export class ConversationService {
   /**
    * Procesa un mensaje entrante de un cliente de principio a fin
    */
-  public async handleIncomingMessage(phone: string, message: string, media: any[] = [], lastMsgId?: string) {
+  public async handleIncomingMessage(phone: string, message: string, media: any[] = [], lastMsgId?: string, startTime?: number) {
     logger.info(`🤖 [ORQUESTADOR] Iniciando proceso para el número: ${phone} | Media: ${media.length}`);
 
     // 1. Obtener o crear Lead Raw
@@ -82,7 +82,7 @@ export class ConversationService {
 
     // 5. Procesar con IA
     // logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);
-    return await this.processWithAI(phone, message, leadData, pastHistory, media);
+    return await this.processWithAI(phone, message, leadData, pastHistory, media, startTime);
   }
 
   /**
@@ -99,7 +99,7 @@ export class ConversationService {
   /**
    * Orquestación del flujo de IA (Multimodal)
    */
-  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = []) {
+  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = [], startTime?: number) {
     try {
       // A. Preparar contexto e historial
       // logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
@@ -189,7 +189,11 @@ export class ConversationService {
 
       // I. Notificar actualización final
       systemEvents.emit('lead_updated', { phone, type: 'ai_response' });
-      logger.info(`Evento 'ai_response' emitido al Dashboard.`);
+
+      if (startTime) {
+        const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+        logger.info(`⏱️ [TIEMPO TOTAL] Ciclo de respuesta completado en ${totalDuration}s para ${phone}`);
+      }
 
       return { status: 'ai_responded', text: responseText };
     } catch (error: any) {
