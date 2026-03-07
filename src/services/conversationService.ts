@@ -13,7 +13,7 @@ export class ConversationService {
   /**
    * Procesa un mensaje entrante de un cliente de principio a fin
    */
-  public async handleIncomingMessage(phone: string, message: string, media: any[] = []) {
+  public async handleIncomingMessage(phone: string, message: string, media: any[] = [], lastMsgId?: string) {
     logger.info(`🤖 [ORQUESTADOR] Iniciando proceso para el número: ${phone} | Media: ${media.length}`);
 
     // 1. Obtener o crear Lead Raw
@@ -78,7 +78,7 @@ export class ConversationService {
     logger.info(`  ↳ Bot ACTIVO. El Agente Inteligente tomará el caso.`);
 
     // 4. Activar Indicador de Escritura (Typing...)
-    await whatsappService.sendTypingIndicator(phone);
+    await whatsappService.sendTypingIndicator(phone, lastMsgId);
 
     // 5. Procesar con IA
     logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);

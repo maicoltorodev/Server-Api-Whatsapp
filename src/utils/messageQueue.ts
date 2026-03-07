@@ -19,10 +19,11 @@ export class MessageQueue {
    * Si llegan múltiples mensajes del mismo número antes de que se acabe el reloj,
    * se agrupan en un solo bloque y se reinicia el reloj.
    */
-  public enqueueMessage(from: string, content: { text?: string; media?: { data: string; mimeType: string } }) {
+  public enqueueMessage(from: string, content: { text?: string; media?: { data: string; mimeType: string } }, lastMsgId?: string) {
     if (this.queues.has(from)) {
       const userQueue = this.queues.get(from);
       userQueue.contents.push(content);
+      if (lastMsgId) userQueue.lastMsgId = lastMsgId;
       clearTimeout(userQueue.timer);
 
       logger.info(
@@ -36,6 +37,7 @@ export class MessageQueue {
       this.queues.set(from, {
         contents: [content],
         timer: timer,
+        lastMsgId: lastMsgId
       });
     }
   }
@@ -55,13 +57,14 @@ export class MessageQueue {
     if (!userQueue) return;
 
     this.processingPhones.add(from);
+    const { contents, lastMsgId } = userQueue;
     this.queues.delete(from);
 
     // Combinar textos y recolectar media
     const texts: string[] = [];
     const mediaItems: any[] = [];
 
-    userQueue.contents.forEach((c: any) => {
+    contents.forEach((c: any) => {
       if (c.text) texts.push(c.text);
       if (c.media) mediaItems.push(c.media);
     });
@@ -69,12 +72,12 @@ export class MessageQueue {
     const combinedText = texts.join('. ');
 
     logger.info(
-      `[BLOQUE COMBINADO LISTO] -> Enviando a IA\nUsuario: ${from}\nUnificado (${userQueue.contents.length} envíos en 1): "${combinedText}" | Media count: ${mediaItems.length}`
+      `[BLOQUE COMBINADO LISTO] -> Enviando a IA\nUsuario: ${from}\nUnificado (${contents.length} envíos en 1): "${combinedText}" | Media count: ${mediaItems.length}`
     );
 
     concurrencyQueue.enqueue(async () => {
       try {
-        await conversationService.handleIncomingMessage(from, combinedText, mediaItems);
+        await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId);
       } catch (error: any) {
         logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
       } finally {

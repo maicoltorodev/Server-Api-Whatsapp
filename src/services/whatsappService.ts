@@ -129,25 +129,42 @@ export class WhatsAppService {
   }
 
   /**
-   * Envía el indicador de "escribiendo..." (Sender Action)
+   * Envía el indicador de "escribiendo..." (Nativo Meta v22.0+)
    */
-  public async sendTypingIndicator(to: string) {
+  public async sendTypingIndicator(to: string, messageId?: string) {
+    if (!messageId) {
+      logger.warn(`⚠️ [WHATSAPP API] No se puede enviar indicador de escritura a ${to}: Falta ID del mensaje.`);
+      return;
+    }
+
+    logger.debug(`[WHATSAPP API] Intentando activar "Escribiendo..." para mensaje ${messageId}...`);
     try {
-      // Nota: Oficialmente WhatsApp usa 'typing' para mostrar el estado en el chat.
-      // Algunas versiones/librerías lo llaman 'sender_action' o 'typing'
-      await fetch(this.baseUrl, {
+      const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: this.headers,
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to,
-          sender_action: 'typing'
+          status: 'read',
+          message_id: messageId,
+          typing_indicator: {
+            type: 'text'
+          }
         })
       });
-      logger.info(`✍️ [WHATSAPP API] Indicador de escritura enviado a ${to}`);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        logger.warn(`⚠️ [WHATSAPP API] El indicador de escritura no fue aceptado por Meta.`, {
+          status: response.status,
+          data
+        });
+        return;
+      }
+
+      logger.info(`✍️ [WHATSAPP API] Indicador de escritura activo para ${to}`);
     } catch (error: any) {
-      logger.error(`❌ [WHATSAPP API - ERROR] No se pudo enviar el indicador de escritura a ${to}.`, {
+      logger.error(`❌ [WHATSAPP API - ERROR] Fallo crítico al intentar enviar el indicador a ${to}.`, {
         message: error.message
       });
     }

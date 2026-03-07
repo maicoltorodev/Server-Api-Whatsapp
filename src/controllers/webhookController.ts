@@ -56,7 +56,7 @@ export class WebhookController {
               };
 
               logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
-              messageQueue.enqueueMessage(from, mediaContent);
+              messageQueue.enqueueMessage(from, mediaContent, message.id);
               return;
             }
           }
@@ -67,7 +67,7 @@ export class WebhookController {
       }
 
       logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
-      messageQueue.enqueueMessage(from, { text });
+      messageQueue.enqueueMessage(from, { text }, msgId);
     } catch (error: any) {
       logger.error('Error crítico en WebhookController', { error });
       await this.handleCriticalError(req.body, error);
