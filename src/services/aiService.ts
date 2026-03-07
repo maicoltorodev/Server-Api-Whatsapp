@@ -15,7 +15,7 @@ export class AIService {
    * Inicializa el modelo usando la memoria RAM (Cero Queries)
    * Retorna una instancia de modelo configurada para este usuario/contexto.
    */
-  public async initializeModel(leadData: any): Promise<GenerativeModel> {
+  public async initializeModel(leadData: any, hasMedia: boolean = false): Promise<GenerativeModel> {
     logger.info(`[IA] Inicializando instancia de modelo para ${leadData?.phone}...`);
 
     // Obtener configuración inmutable desde RAM
@@ -32,7 +32,7 @@ export class AIService {
       .setCatalog(catalogArray)
       .setOperations(appConfig)
       .setActiveAppointments(activeAppts)
-      .setMultimodalInstructions()
+      .setMultimodalInstructions(hasMedia)
       .setMasterInstructions(appConfig)
       .build();
 
@@ -71,8 +71,8 @@ export class AIService {
   /**
    * Alias para inicialización rápida
    */
-  public async prepareContext(leadData: any): Promise<GenerativeModel> {
-    return await this.initializeModel(leadData);
+  public async prepareContext(leadData: any, hasMedia: boolean = false): Promise<GenerativeModel> {
+    return await this.initializeModel(leadData, hasMedia);
   }
 
   /**

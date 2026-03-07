@@ -32,17 +32,13 @@ export class SystemPromptBuilder {
   }
 
   /**
-   * Inyecta el catálogo de servicios en formato comprimido (JSON).
+   * Inyecta el catálogo de servicios en formato comprimido.
    */
   public setCatalog(catalog: any[]): this {
-    const compactCatalog = JSON.stringify(
-      catalog.map((s) => ({
-        svc: s.title,
-        min: s.duration_minutes,
-        $: s.price,
-      }))
-    );
-    this.components['CAT'] = `🛒 CATÁLOGO DE SERVICIOS: ${compactCatalog}`;
+    if (!catalog || catalog.length === 0) return this;
+
+    const lines = catalog.map(s => `* ${s.title}: ${s.duration_minutes}min ($${s.price})`);
+    this.components['CAT'] = `🛒 CATÁLOGO:\n${lines.join('\n')}`;
     return this;
   }
 
@@ -51,28 +47,17 @@ export class SystemPromptBuilder {
    */
   public setOperations(config: IAppConfig): this {
     const now = new Date();
-    // Formato ultra-claro para evitar confusión entre DD/MM y MM/DD en la IA
     const dateText = new Intl.DateTimeFormat('es-CO', {
       timeZone: 'America/Bogota',
       weekday: 'long',
-      year: 'numeric',
-      month: 'long',
       day: '2-digit',
+      month: 'long',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     }).format(now);
 
-    const ops = {
-      n: config.siteName || 'Pet Care Studio',
-      t: dateText,
-      h: `${config.hours.open}-${config.hours.close}`,
-      off: config.hours.closedDays || [],
-      cap: config.hours.concurrency || 1,
-      m: config.hours.defaultDuration || 60
-    };
-
-    this.components['OPS'] = `⚙️ LOGÍSTICA OPS: ${JSON.stringify(ops)}\n⚠️ CMD: Agenda cada mascota por SEPARADO (1 cita x animal).`;
+    this.components['OPS'] = `⚙️ OPS: ${config.siteName} | ${dateText} | Horario: ${config.hours.open}-${config.hours.close} | Off: ${config.hours.closedDays?.join(',') || 'N/A'}`;
     return this;
   }
 
@@ -102,13 +87,14 @@ export class SystemPromptBuilder {
   }
 
   /**
-   * Instrucciones específicas para el manejo de archivos multimedia (Voz e Imagen)
+   * Instrucciones específicas para el manejo de archivos multimedia.
    */
-  public setMultimodalInstructions(): this {
-    this.components['MULTI'] = `📸 PROTOCOLO MULTIMEDIA:
-1. IMÁGENES: Eres capaz de ver fotos. Si te envían una con texto ilegible, papel arrugado o borrosa, menciona qué alcanzas a distinguir y pide una foto más clara si es vital.
-2. AUDIOS: Escuchas notas de voz. Si hay mucho ruido de fondo o no entiendes, pide amablemente que lo repitan.
-3. RECUERDA: La visión se vuelve conocimiento; una vez procesada la imagen, úsala para los agendamientos.`;
+  public setMultimodalInstructions(hasMedia: boolean): this {
+    if (!hasMedia) {
+      delete this.components['MULTI'];
+      return this;
+    }
+    this.components['MULTI'] = `📸 MULTIMEDIA: Escuchas audios y ves fotos. Si es borroso o ruidoso, pide repetir. Usa lo visual para agendar.`;
     return this;
   }
 

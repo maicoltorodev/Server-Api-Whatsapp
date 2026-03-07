@@ -103,7 +103,8 @@ export class ConversationService {
     try {
       // A. Preparar contexto e historial
       // logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
-      const model = await aiService.prepareContext(leadData);
+      const hasMedia = media && media.length > 0;
+      const model = await aiService.prepareContext(leadData, hasMedia);
 
       const history = preloadedHistory || await chatModel.getHistory(phone);
       // logger.info(`Historial cargado: ${history.length} mensajes previos.`);
