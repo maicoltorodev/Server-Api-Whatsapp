@@ -26,13 +26,13 @@ export class MessageQueue {
       if (lastMsgId) userQueue.lastMsgId = lastMsgId;
       clearTimeout(userQueue.timer);
 
-      logger.info(
+      /* logger.info(
         `[EMBUDO] Ráfaga activa (${userQueue.contents.length} msgs) para ${from}. Reloj reiniciado a 5s.`
-      );
+      ); */
 
       userQueue.timer = setTimeout(() => this.processMessages(from), this.delayMs);
     } else {
-      logger.info(`[EMBUDO] Recibiendo mensaje de ${from}... Esperando 5s por si manda más.`);
+      // logger.info(`[EMBUDO] Recibiendo mensaje de ${from}... Esperando 5s por si manda más.`);
       const timer = setTimeout(() => this.processMessages(from), this.delayMs);
       this.queues.set(from, {
         contents: [content],
@@ -82,7 +82,7 @@ export class MessageQueue {
         logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
       } finally {
         this.processingPhones.delete(from);
-        logger.info(`[EMBUDO] Proceso finalizado para ${from}. Bloqueo liberado.`);
+        // logger.info(`[EMBUDO] Proceso finalizado para ${from}. Bloqueo liberado.`);
       }
     });
   }

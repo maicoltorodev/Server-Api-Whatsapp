@@ -24,10 +24,10 @@ export class WebhookController {
         return;
       }
 
-      logger.info('🟢 [WEBHOOK] --- NUEVO MENSAJE DE WHATSAPP DETECTADO ---');
+      // logger.info('🟢 [WEBHOOK] --- NUEVO MENSAJE DE WHATSAPP DETECTADO ---');
 
       const { id: msgId, from, text, isText } = message as any;
-      logger.info(`🔵 [MENSAJE NUEVO] Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
+      // logger.info(`🔵 [MENSAJE NUEVO] Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
 
       // 2. Seguridad y Duplicados
       if (rateLimiter.isMessageProcessed(msgId)) {
@@ -35,7 +35,7 @@ export class WebhookController {
         return;
       }
       await whatsappService.markAsRead(msgId);
-      logger.info(`Mensaje marcado como leído.`);
+      // logger.info(`Mensaje marcado como leído.`);
 
       // 3. Procesar Contenido (Media o Texto)
       if (!isText) {
@@ -55,7 +55,7 @@ export class WebhookController {
                 }
               };
 
-              logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
+              // logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
               messageQueue.enqueueMessage(from, mediaContent, message.id);
               return;
             }
@@ -66,7 +66,7 @@ export class WebhookController {
         return;
       }
 
-      logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
+      // logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
       messageQueue.enqueueMessage(from, { text }, msgId);
     } catch (error: any) {
       logger.error('Error crítico en WebhookController', { error });

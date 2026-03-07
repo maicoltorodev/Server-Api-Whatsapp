@@ -152,9 +152,9 @@ export class AIService {
     const safeMessage = this._filterSafetyFalsePositives(message);
     const sanitizedHistory = this._sanitizeHistory(history);
 
-    logger.info(
+    /* logger.info(
       `[IA] Iniciando chat con historial sanitizado (${sanitizedHistory.length} msgs) y ${media.length} archivos media.`
-    );
+    ); */
 
     const chatSession = model.startChat({
       history: sanitizedHistory,
@@ -172,13 +172,13 @@ export class AIService {
             mimeType: item.mimeType
           }
         });
-        logger.info(`[IA - MULTIMODAL] Adjuntando archivo #${index + 1} (${item.mimeType})`);
+        // logger.info(`[IA - MULTIMODAL] Adjuntando archivo #${index + 1} (${item.mimeType})`);
       });
     }
 
-    logger.info(
+    /* logger.info(
       `[IA - PROCESANDO] Enviando prompt multimodal al modelo (Text: "${safeMessage.substring(0, 50)}...")`
-    );
+    ); */
 
     const result = await this._withRetry(async () => {
       // sendMessage puede recibir un array de partes para multimodalidad
@@ -187,8 +187,12 @@ export class AIService {
 
     const usage = result?.response?.usageMetadata;
     if (usage) {
-      logger.info(
-        `[IA] Tokens: Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`
+      const promptCost = (usage.promptTokenCount / 1000000) * 0.075;
+      const candidatesCost = (usage.candidatesTokenCount / 1000000) * 0.30;
+      const totalCost = (promptCost + candidatesCost).toFixed(5);
+
+      logger.success(
+        `💰 [TOKENS] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD`
       );
     }
 
@@ -246,8 +250,12 @@ export class AIService {
 
       const usage = result.response.usageMetadata;
       if (usage) {
-        logger.info(
-          `[IA] Tokens (Herramienta): Prompt=${usage.promptTokenCount} | Respuesta=${usage.candidatesTokenCount} | Total=${usage.totalTokenCount}`
+        const promptCost = (usage.promptTokenCount / 1000000) * 0.075;
+        const candidatesCost = (usage.candidatesTokenCount / 1000000) * 0.30;
+        const totalCost = (promptCost + candidatesCost).toFixed(5);
+
+        logger.success(
+          `💰 [TOKENS TOOL] Entrada: ${usage.promptTokenCount} | Salida: ${usage.candidatesTokenCount} | Costo: $${totalCost} USD`
         );
       }
 

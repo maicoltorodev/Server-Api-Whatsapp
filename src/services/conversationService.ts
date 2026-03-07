@@ -17,10 +17,10 @@ export class ConversationService {
     logger.info(`🤖 [ORQUESTADOR] Iniciando proceso para el número: ${phone} | Media: ${media.length}`);
 
     // 1. Obtener o crear Lead Raw
-    logger.info(`[PASO 1] Verificando perfil del cliente en la Base de Datos...`);
+    // logger.info(`[PASO 1] Verificando perfil del cliente en la Base de Datos...`);
     let rawLead = await leadModel.getByPhone(phone);
     if (!rawLead) {
-      logger.info(`  ↳ Cliente nuevo. Creando perfil inicial...`);
+      // logger.info(`  ↳ Cliente nuevo. Creando perfil inicial...`);
       rawLead = await leadModel.upsert({
         phone,
         name: 'Nuevo Cliente',
@@ -36,10 +36,10 @@ export class ConversationService {
 
     const parsed = LeadProfileSchema.safeParse(rawLead);
     const leadData: ILeadProfile = parsed.success ? parsed.data : (rawLead as any);
-    logger.info(`  ↳ Perfil listo: ${leadData.name || 'Sin nombre'} | Etapa: ${leadData.current_step}`);
+    // logger.info(`  ↳ Perfil listo: ${leadData.name || 'Sin nombre'} | Etapa: ${leadData.current_step}`);
 
     // 2. Registrar mensaje del cliente. CAPTURAR HISTORIAL PASADO ANTES DE AGREGAR EL NUEVO
-    logger.info(`[PASO 2] Escribiendo el mensaje entrante en el Historial...`);
+    // logger.info(`[PASO 2] Escribiendo el mensaje entrante en el Historial...`);
     const pastHistory = await chatModel.getHistory(phone);
 
     // Subir media a Storage si existe
@@ -70,18 +70,18 @@ export class ConversationService {
     systemEvents.emit('lead_updated', { phone, type: 'new_message' });
 
     // 3. Verificar si el bot debe responder
-    logger.info(`[PASO 3] Consultando permisos de intervención del Bot...`);
+    // logger.info(`[PASO 3] Consultando permisos de intervención del Bot...`);
     if (leadData.bot_active === false) {
-      logger.info(`  ↳ Bot en PAUSA. Delegando chat al dueño.`);
+      logger.warn(`  ↳ Bot en PAUSA para ${phone}. Delegando chat al dueño.`);
       return await this.handleHumanIntervention(phone, leadData, message);
     }
-    logger.info(`  ↳ Bot ACTIVO. El Agente Inteligente tomará el caso.`);
+    // logger.info(`  ↳ Bot ACTIVO. El Agente Inteligente tomará el caso.`);
 
     // 4. Activar Indicador de Escritura (Typing...)
     await whatsappService.sendTypingIndicator(phone, lastMsgId);
 
     // 5. Procesar con IA
-    logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);
+    // logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);
     return await this.processWithAI(phone, message, leadData, pastHistory, media);
   }
 
@@ -102,14 +102,14 @@ export class ConversationService {
   public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = []) {
     try {
       // A. Preparar contexto e historial
-      logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
+      // logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
       const model = await aiService.prepareContext(leadData);
 
       const history = preloadedHistory || await chatModel.getHistory(phone);
-      logger.info(`Historial cargado: ${history.length} mensajes previos.`);
+      // logger.info(`Historial cargado: ${history.length} mensajes previos.`);
 
       // B. Generar respuesta
-      logger.info(`[IA - PROCESANDO] Consultando a Gemini (Multimodal) para ${phone}...`);
+      // logger.info(`[IA - PROCESANDO] Consultando a Gemini (Multimodal) para ${phone}...`);
       const aiResponse = await aiService.generateResponse(model, message, history, media);
       let responseText = '';
 
