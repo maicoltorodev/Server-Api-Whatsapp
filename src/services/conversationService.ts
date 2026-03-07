@@ -38,8 +38,9 @@ export class ConversationService {
     const leadData: ILeadProfile = parsed.success ? parsed.data : (rawLead as any);
     logger.info(`  ↳ Perfil listo: ${leadData.name || 'Sin nombre'} | Etapa: ${leadData.current_step}`);
 
-    // 2. Registrar mensaje del cliente
+    // 2. Registrar mensaje del cliente. CAPTURAR HISTORIAL PASADO ANTES DE AGREGAR EL NUEVO
     logger.info(`[PASO 2] Escribiendo el mensaje entrante en el Historial...`);
+    const pastHistory = await chatModel.getHistory(phone);
 
     // Subir media a Storage si existe
     const mediaParts: any[] = [];
@@ -81,7 +82,7 @@ export class ConversationService {
 
     // 5. Procesar con IA
     logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);
-    return await this.processWithAI(phone, message, leadData, media);
+    return await this.processWithAI(phone, message, leadData, pastHistory, media);
   }
 
   /**
@@ -98,13 +99,13 @@ export class ConversationService {
   /**
    * Orquestación del flujo de IA (Multimodal)
    */
-  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, media: any[] = []) {
+  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = []) {
     try {
       // A. Preparar contexto e historial
       logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
       const model = await aiService.prepareContext(leadData);
 
-      const history = await chatModel.getHistory(phone);
+      const history = preloadedHistory || await chatModel.getHistory(phone);
       logger.info(`Historial cargado: ${history.length} mensajes previos.`);
 
       // B. Generar respuesta

@@ -214,7 +214,7 @@ export class AIService {
       for (const call of currentCalls) {
         const toolName = call.name;
         const args = call.args;
-        logger.info(`[TOOL] Executing: ${toolName} para ${phone}`);
+        logger.info(`[TOOL] Ejecutando: ${toolName} para ${phone}`, { args });
 
         try {
           const toolResult = await (toolService as any)[toolName](args, phone);
