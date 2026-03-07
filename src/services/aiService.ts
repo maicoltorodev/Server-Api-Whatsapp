@@ -298,14 +298,24 @@ export class AIService {
       // Clonar profundamente el mensaje para no mutar el original
       const safeMsg = JSON.parse(JSON.stringify(msg));
 
-      // Aplicar filtro de falsos positivos SÓLO si es texto
-      // y respetar function calls / function responses
+      // 3. Limpieza de campos no soportados por la API de Google (mediaUrl, mediaType)
+      // Whitelist de campos permitidos para evitar errores 400 Bad Request
       if (safeMsg.parts && Array.isArray(safeMsg.parts)) {
         safeMsg.parts = safeMsg.parts.map((p: any) => {
-          if (p.text) {
-            p.text = this._filterSafetyFalsePositives(p.text);
+          // Si el objeto tiene rastros de campos de dashboard, lo convertimos a texto
+          if ('mediaUrl' in p || 'mediaType' in p) {
+            const typeLabel = (p.mediaType === 'image' || p.mediaUrl?.includes('image')) ? 'IMAGEN' : 'AUDIO';
+            return { text: `[ARCHIVO MULTIMEDIA: ${typeLabel}]` };
           }
-          return p;
+
+          // Whitelist estricta: solo permitimos campos oficiales del SDK de Gemini
+          const cleanPart: any = {};
+          if (p.text) cleanPart.text = this._filterSafetyFalsePositives(p.text);
+          if (p.inlineData) cleanPart.inlineData = p.inlineData;
+          if (p.functionCall) cleanPart.functionCall = p.functionCall;
+          if (p.functionResponse) cleanPart.functionResponse = p.functionResponse;
+
+          return Object.keys(cleanPart).length > 0 ? cleanPart : { text: "[Mensaje vacío]" };
         });
       }
 

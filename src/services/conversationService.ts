@@ -205,7 +205,7 @@ export class ConversationService {
       await leadModel.deactivateBot(phone);
 
       // Enviamos el mensaje de fallback INMEDIATAMENTE para detener el "Escribiendo..." y dar feedback
-      await whatsappService.sendMessage(phone, "Disculpa, me dio un pequeño mareo técnico 😵‍滋. Un humano tomará mi lugar en breve para ayudarte.");
+      await whatsappService.sendMessage(phone, "Disculpa, hubo un problema, te remitiremos a un humano en breve.");
 
       await notificationService.notifyHumanRequired(phone, leadData.name || 'Cliente', `[ERROR CRÍTICO] El sistema falló al procesar: "${message}"`);
       systemEvents.emit('lead_updated', { phone, type: 'bot_toggle', bot_active: false });

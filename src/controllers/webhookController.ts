@@ -48,7 +48,7 @@ export class WebhookController {
             if (buffer) {
               const base64Media = buffer.toString('base64');
               const mediaContent = {
-                text: message.text || (message.type === 'audio' ? '[AUDIO]' : '[IMAGEN]'),
+                text: message.text || (message.type === 'audio' ? '[AUDIO]' : (message.type === 'sticker' ? '[STICKER]' : '[IMAGEN]')),
                 media: {
                   data: base64Media,
                   mimeType: message.mimeType
@@ -62,11 +62,7 @@ export class WebhookController {
           }
         }
 
-        logger.warn('Contenido no soportado o error en descarga. Enviando aviso.');
-        await whatsappService.sendMessage(
-          from,
-          '¡Hola! 🐾 Por ahora solo puedo procesar mensajes de texto, fotos y audios. ¡No olvides pedir hablar con un humano si necesitas algo urgente!'
-        );
+        logger.warn(`[WEBHOOK] Contenido no soportado (Tipo: ${message.type}) recibido de ${from}. IGNORANDO silenciosamente según reglas de negocio.`);
         return;
       }
 
@@ -105,4 +101,3 @@ export class WebhookController {
 }
 
 export default new WebhookController();
-

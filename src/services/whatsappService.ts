@@ -168,10 +168,10 @@ export class WhatsAppService {
 
     // Validar que sea un mensaje de texto válido
     if (!isValidWhatsAppMessage(message)) {
-      // Si es imagen o audio, los procesamos de forma especial
-      if (message.type === 'image' || message.type === 'audio') {
-        const mediaId = message.image?.id || message.audio?.id;
-        const mimeType = message.image?.mime_type || message.audio?.mime_type;
+      // Si es imagen, audio o sticker, los procesamos de forma especial
+      if (message.type === 'image' || message.type === 'audio' || message.type === 'sticker') {
+        const mediaId = message.image?.id || message.audio?.id || message.sticker?.id;
+        const mimeType = message.image?.mime_type || message.audio?.mime_type || message.sticker?.mime_type;
         const caption = message.image?.caption || "";
 
         return {
