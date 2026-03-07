@@ -16,6 +16,8 @@ export const BusinessHoursSchema = z.object({
 });
 
 export const AgentConfigSchema = z.object({
+  name: z.string().default('Miel'),
+  personality: z.string().default('Empático, amable y profesional'),
   systemInstructions: z.string().default(''),
 });
 

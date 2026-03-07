@@ -27,13 +27,14 @@ export class AIService {
 
     // Construir el Prompt Maestro Modularmente
     const promptBuilder = new SystemPromptBuilder()
+      .setPersona() // Hardcoded
       .setLeadContext(leadData?.name, leadData?.current_step)
       .setMedicalHistory(leadData?.medical_history)
       .setCatalog(catalogArray)
       .setOperations(appConfig)
       .setActiveAppointments(activeAppts)
       .setMultimodalInstructions(hasMedia)
-      .setMasterInstructions(appConfig);
+      .setMasterInstructions(); // Hardcoded
 
     const systemInstruction = promptBuilder.build();
     const components = promptBuilder.getComponents();
@@ -217,8 +218,15 @@ export class AIService {
 
     // Auditoría de Tokens de Entrada Dinámica (Costo de ejecución)
     try {
-      const historyTokens = (await model.countTokens({ contents: sanitizedHistory })).totalTokens;
-      const mediaTokens = media.length > 0 ? (await model.countTokens({ contents: [{ role: 'user', parts: messageParts.filter(p => p.inlineData) }] })).totalTokens : 0;
+      const historyTokens = sanitizedHistory.length > 0
+        ? (await model.countTokens({ contents: sanitizedHistory })).totalTokens
+        : 0;
+
+      const mediaParts = messageParts.filter(p => p.inlineData);
+      const mediaTokens = mediaParts.length > 0
+        ? (await model.countTokens({ contents: [{ role: 'user', parts: mediaParts }] })).totalTokens
+        : 0;
+
       const systemResult = await model.countTokens(""); // System + Tools
 
       logger.info(`🔌 [IA - FLUJO ENTRADA] Desglose de carga para este mensaje:`);
@@ -226,7 +234,7 @@ export class AIService {
       logger.info(`   ↳ MEMORIA (Hist)  | ${historyTokens.toString().padStart(4)} tkn`);
       if (mediaTokens > 0) logger.info(`   ↳ MULTIMEDIA     | ${mediaTokens.toString().padStart(4)} tkn`);
     } catch (err) {
-      // Silencioso para no interrumpir el flujo si falla el conteo
+      logger.error('Error en auditoría dinámica de tokens', { err });
     }
 
     const result = await this._withRetry(async () => {

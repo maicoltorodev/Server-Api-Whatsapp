@@ -79,6 +79,8 @@ class ConfigProvider {
           defaultDuration: rawConfig.appointment_duration_minutes,
         },
         agent: {
+          name: rawConfig.agent_name || 'Miel',
+          personality: rawConfig.agent_personality || 'Empático, amable y profesional',
           systemInstructions: rawConfig.system_instructions || rawConfig.bot_system_prompt || '',
         },
       };
