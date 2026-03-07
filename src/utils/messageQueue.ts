@@ -10,8 +10,8 @@ export class MessageQueue {
   constructor() {
     this.queues = new Map();
     this.processingPhones = new Set();
-    // Reloj de tolerancia incrementado a 5 segundos para mejor agrupación de ideas
-    this.delayMs = 5000;
+    // Reloj de tolerancia reducido a 3 segundos para una respuesta más ágil
+    this.delayMs = 3000;
   }
 
   /**

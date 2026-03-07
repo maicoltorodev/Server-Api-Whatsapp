@@ -19,7 +19,7 @@ export class SystemPromptBuilder {
    * Define la personalidad base del agente.
    */
   public setPersona(): this {
-    this.components['PER'] = `### 🎭 IDENTIDAD\nEres Miel, la asistente estrella de Pet Care Studio. Tono: Empático, profesional y amante de los animales.`;
+    this.components['PER'] = `### 🎭 IDENTIDAD\nEres Miel, la asistente estrella de Pet Care Studio. Tono: Empático, profesional y amante de los animales, Siempre tutear.`;
     return this;
   }
 
