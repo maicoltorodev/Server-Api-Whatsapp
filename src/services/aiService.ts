@@ -26,15 +26,17 @@ export class AIService {
     const activeAppts = await appointmentService.getActiveAppointmentsByPhone(leadData?.phone);
 
     // Construir el Prompt Maestro Modularmente
-    const systemInstruction = new SystemPromptBuilder()
+    const promptBuilder = new SystemPromptBuilder()
       .setLeadContext(leadData?.name, leadData?.current_step)
       .setMedicalHistory(leadData?.medical_history)
       .setCatalog(catalogArray)
       .setOperations(appConfig)
       .setActiveAppointments(activeAppts)
       .setMultimodalInstructions(hasMedia)
-      .setMasterInstructions(appConfig)
-      .build();
+      .setMasterInstructions(appConfig);
+
+    const systemInstruction = promptBuilder.build();
+    const components = promptBuilder.getComponents();
 
     const safetySettings = [
       {
@@ -62,9 +64,30 @@ export class AIService {
       safetySettings,
     });
 
-    logger.info(
-      `[IA] Pre-Prompt Ensamblado (${systemInstruction.length} caracteres):\n====================\n${systemInstruction}\n====================`
-    );
+    // Auditoría de Tokens detallada
+    try {
+      const keys = Object.keys(components);
+      const tokenCounts = await Promise.all(
+        keys.map(k => modelObj.countTokens(components[k]))
+      );
+
+      const totalResult = await modelObj.countTokens(systemInstruction);
+
+      logger.info(`📊 [IA - TOKENS] Desglose del System Prompt (${totalResult.totalTokens} tokens total):`);
+      keys.forEach((key, i) => {
+        const tokens = tokenCounts[i].totalTokens;
+        const percentage = ((tokens / totalResult.totalTokens) * 100).toFixed(1);
+        logger.info(`   ↳ ${key.padEnd(6)} | ${tokens.toString().padStart(4)} tkn | ${percentage}%`);
+      });
+
+      // Si el prompt es muy largo, alertar
+      if (totalResult.totalTokens > 8000) {
+        logger.warn(`⚠️ [IA - OPTIMIZACIÓN] El System Prompt es muy pesado (${totalResult.totalTokens} tokens). Considera podar instrucciones.`);
+      }
+    } catch (countError) {
+      logger.error('No se pudo realizar el desglose de tokens', { countError });
+    }
+
     return modelObj;
   }
 

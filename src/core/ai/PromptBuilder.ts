@@ -99,6 +99,13 @@ export class SystemPromptBuilder {
   }
 
   /**
+   * Retorna los componentes individuales para auditoría o conteo de tokens.
+   */
+  public getComponents(): Record<string, string> {
+    return { ...this.components };
+  }
+
+  /**
    * Ensambla y retorna el sistema de instrucciones final en orden determinista
    */
   public build(): string {
