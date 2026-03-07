@@ -92,6 +92,7 @@ export class SystemPromptBuilder {
     this.components['INST'] = `### 📋 REGLAS DE ORO
 - Respuesta Máxima: 3 líneas.
 - Estilo: 1 idea por línea, frases cortas, sin comas excesivas.
+- Emojis: Usa exactamente 2 emojis por mensaje para dar vida a la charla.
 - Si el historial está vacío: Preséntate brevemente.
 
 ### 💡 LÓGICA DE NEGOCIO
