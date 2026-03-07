@@ -8,7 +8,7 @@ export const tools = {
   functionDeclarations: [
     {
       name: 'update_lead_info',
-      description: 'Guarda o actualiza el nombre real del cliente y su etapa en el embudo (SALUDO, CALIFICACION, AGENDA).',
+      description: 'Actualiza el perfil del cliente y su etapa: SALUDO, CALIFICACION, COTIZACION (precios), AGENDA (cupos), CONFIRMACION (cita lista) o DESPEDIDA.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -17,7 +17,7 @@ export const tools = {
             description: 'Nombre REAL del humano (persona). PROHIBIDO usar "Cliente de [Mascota]".'
           },
           product_service: { type: 'STRING' },
-          current_step: { type: 'STRING', enum: ['SALUDO', 'CALIFICACION', 'AGENDA', 'CIERRE'] }
+          current_step: { type: 'STRING', enum: ['SALUDO', 'CALIFICACION', 'COTIZACION', 'AGENDA', 'CONFIRMACION', 'DESPEDIDA'] }
         },
       },
     },
