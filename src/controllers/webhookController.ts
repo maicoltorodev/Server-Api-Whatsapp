@@ -6,7 +6,7 @@ import notificationService from '../services/notificationService';
 import rateLimiter from '../middleware/rateLimit';
 import config from '../config';
 import messageQueue from '../utils/messageQueue';
-import logger from '../utils/logger';
+import logger, { correlationContext } from '../utils/logger';
 
 export class WebhookController {
   /**
@@ -25,50 +25,50 @@ export class WebhookController {
         return;
       }
 
-      // logger.info('🟢 [WEBHOOK] --- NUEVO MENSAJE DE WHATSAPP DETECTADO ---');
-
       const { id: msgId, from, text, isText } = message as any;
-      // logger.info(`🔵 [MENSAJE NUEVO] Mensaje Recibido: ID: ${msgId} | Desde: ${from} | ¿Es Texto?: ${isText}`);
+      const correlationId = msgId.slice(-4);
 
-      // 2. Seguridad y Duplicados
-      if (rateLimiter.isMessageProcessed(msgId)) {
-        logger.warn(`Mensaje duplicado detectado (ID: ${msgId}). Ignorando.`);
-        return;
-      }
-      await whatsappService.markAsRead(msgId);
-      // logger.info(`Mensaje marcado como leído.`);
+      return await correlationContext.run({ id: correlationId }, async () => {
+        // 2. Seguridad y Duplicados
+        if (rateLimiter.isMessageProcessed(msgId)) {
+          logger.warn(`Mensaje duplicado detectado (ID: ${msgId}). Ignorando.`);
+          return;
+        }
+        await whatsappService.markAsRead(msgId);
+        // logger.info(`Mensaje marcado como leído.`);
 
-      // 3. Procesar Contenido (Media o Texto)
-      if (!isText) {
-        if (message.isMedia && message.mediaId) {
-          logger.info(`📸 [MEDIA DETECTADO] Descargando ${message.type} de ${from}...`);
+        // 3. Procesar Contenido (Media o Texto)
+        if (!isText) {
+          if (message.isMedia && message.mediaId) {
+            logger.info(`📸 [MEDIA DETECTADO] Descargando ${message.type} de ${from}...`);
 
-          const mediaUrl = await whatsappService.getMediaUrl(message.mediaId);
-          if (mediaUrl) {
-            const buffer = await whatsappService.downloadMedia(mediaUrl);
-            if (buffer) {
-              const base64Media = buffer.toString('base64');
-              const mediaContent = {
-                text: message.text || (message.type === 'audio' ? '[AUDIO]' : (message.type === 'sticker' ? '[STICKER]' : '[IMAGEN]')),
-                media: {
-                  data: base64Media,
-                  mimeType: message.mimeType
-                }
-              };
+            const mediaUrl = await whatsappService.getMediaUrl(message.mediaId);
+            if (mediaUrl) {
+              const buffer = await whatsappService.downloadMedia(mediaUrl);
+              if (buffer) {
+                const base64Media = buffer.toString('base64');
+                const mediaContent = {
+                  text: message.text || (message.type === 'audio' ? '[AUDIO]' : (message.type === 'sticker' ? '[STICKER]' : '[IMAGEN]')),
+                  media: {
+                    data: base64Media,
+                    mimeType: message.mimeType
+                  }
+                };
 
-              // logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
-              messageQueue.enqueueMessage(from, mediaContent, message.id, startTime);
-              return;
+                // logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
+                messageQueue.enqueueMessage(from, mediaContent, message.id, startTime);
+                return;
+              }
             }
           }
+
+          logger.warn(`[WEBHOOK] Contenido no soportado (Tipo: ${message.type}) recibido de ${from}. IGNORANDO silenciosamente según reglas de negocio.`);
+          return;
         }
 
-        logger.warn(`[WEBHOOK] Contenido no soportado (Tipo: ${message.type}) recibido de ${from}. IGNORANDO silenciosamente según reglas de negocio.`);
-        return;
-      }
-
-      // logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
-      messageQueue.enqueueMessage(from, { text }, msgId, startTime);
+        // logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
+        messageQueue.enqueueMessage(from, { text }, msgId, startTime);
+      });
     } catch (error: any) {
       logger.error('Error crítico en WebhookController', { error });
       await this.handleCriticalError(req.body, error);

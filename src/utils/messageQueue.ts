@@ -1,5 +1,5 @@
 import conversationService from '../services/conversationService';
-import logger from '../utils/logger';
+import logger, { correlationContext } from '../utils/logger';
 import concurrencyQueue from './ConcurrencyQueue';
 
 export class MessageQueue {
@@ -35,11 +35,14 @@ export class MessageQueue {
     } else {
       // logger.info(`[EMBUDO] Recibiendo mensaje de ${from}... Esperando 5s por si manda más.`);
       const timer = setTimeout(() => this.processMessages(from), this.delayMs);
+      const context = correlationContext.getStore();
+
       this.queues.set(from, {
         contents: [content],
         timer: timer,
         lastMsgId: lastMsgId,
-        startTime: startTime || Date.now()
+        startTime: startTime || Date.now(),
+        correlationId: context?.id
       });
     }
   }
@@ -59,35 +62,37 @@ export class MessageQueue {
     if (!userQueue) return;
 
     this.processingPhones.add(from);
-    const { contents, lastMsgId, startTime } = userQueue;
+    const { contents, lastMsgId, startTime, correlationId } = userQueue;
     this.queues.delete(from);
 
-    // ... rest of the method uses contents and lastMsgId ...
+    return await correlationContext.run({ id: correlationId || 'auto' }, async () => {
+      // Combinar textos y recolectar media
+      const texts: string[] = [];
+      const mediaItems: any[] = [];
 
-    // Combinar textos y recolectar media
-    const texts: string[] = [];
-    const mediaItems: any[] = [];
+      contents.forEach((c: any) => {
+        if (c.text) texts.push(c.text);
+        if (c.media) mediaItems.push(c.media);
+      });
 
-    contents.forEach((c: any) => {
-      if (c.text) texts.push(c.text);
-      if (c.media) mediaItems.push(c.media);
-    });
+      const combinedText = texts.join('. ');
 
-    const combinedText = texts.join('. ');
+      logger.info(
+        `[BLOQUE COMBINADO LISTO] -> Enviando a IA\nUsuario: ${from}\nUnificado (${contents.length} envíos en 1): "${combinedText}" | Media count: ${mediaItems.length}`
+      );
 
-    logger.info(
-      `[BLOQUE COMBINADO LISTO] -> Enviando a IA\nUsuario: ${from}\nUnificado (${contents.length} envíos en 1): "${combinedText}" | Media count: ${mediaItems.length}`
-    );
-
-    concurrencyQueue.enqueue(async () => {
-      try {
-        await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId, startTime);
-      } catch (error: any) {
-        logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
-      } finally {
-        this.processingPhones.delete(from);
-        // logger.info(`[EMBUDO] Proceso finalizado para ${from}. Bloqueo liberado.`);
-      }
+      concurrencyQueue.enqueue(async () => {
+        return await correlationContext.run({ id: correlationId || 'auto' }, async () => {
+          try {
+            await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId, startTime);
+          } catch (error: any) {
+            logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
+          } finally {
+            this.processingPhones.delete(from);
+            // logger.info(`[EMBUDO] Proceso finalizado para ${from}. Bloqueo liberado.`);
+          }
+        });
+      });
     });
   }
 }

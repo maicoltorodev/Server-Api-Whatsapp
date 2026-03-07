@@ -1,7 +1,11 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 /**
  * Simple Logger (Native Console)
  * Logs nativos con colores, iconos y formato claro sin dependencias (ANSI).
  */
+
+export const correlationContext = new AsyncLocalStorage<{ id: string }>();
 
 const colors = {
   reset: "\x1b[0m",
@@ -31,14 +35,18 @@ const icons = {
 // Genera el reloj exacto en hora de Bogotá nativo de JS (Dimmed for less noise)
 const getTimestamp = () => {
   const now = new Date();
-  const timeInfo = new Intl.DateTimeFormat('es-CO', {
-    timeZone: 'America/Bogota',
+  const time = now.toLocaleTimeString('es-CO', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  }).format(now);
-  return `${colors.gray}${colors.dim}[${timeInfo}]${colors.reset}`;
+  });
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+
+  const context = correlationContext.getStore();
+  const requestId = context ? `${colors.white}[#${context.id}]${colors.reset} ` : '';
+
+  return `${colors.gray}${colors.dim}[${time}.${ms}]${colors.reset} ${requestId}`;
 };
 
 // Formatea el mensaje aplicando jerarquía visual (Título Bold + Contenido Dim)

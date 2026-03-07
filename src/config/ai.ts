@@ -8,7 +8,7 @@ export const tools = {
   functionDeclarations: [
     {
       name: 'update_lead_info',
-      description: 'HERRAMIENTA DE MEMORIA: Solo úsala si el humano dice MÍNIMO uno de estos 2 datos clave: [1. Su nombre real] [2. Avanza de etapa (pide separar cita -> pasa a AGENDA)]. PROHIBIDO usarla como diario o cadena de pensamiento. NO la uses de forma rutinaria tras cada mensaje.',
+      description: 'Guarda o actualiza el nombre real del cliente y su etapa en el embudo (SALUDO, CALIFICACION, AGENDA).',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -24,7 +24,7 @@ export const tools = {
     {
       name: 'check_availability',
       description:
-        "HERRAMIENTA OBLIGATORIA: Úsala CADA VEZ que el cliente pregunte si hay cupo, si pueden atender a su mascota, o solicite un turno. JAMÁS respondas 'déjame revisar' sin usar esta herramienta. Verifica en tiempo real los espacios libres en la agenda del estudio.",
+        'Consulta espacios libres en la agenda para una fecha y hora específica antes de ofrecer turnos.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -47,7 +47,7 @@ export const tools = {
     {
       name: 'book_appointment',
       description:
-        'HERRAMIENTA FINAL DE CIERRE: Agendar o separar definitivamente una cita confirmada por el cliente. REQUISITO ESTRICTO: Solo úsala si el cliente ya confirmó explícitamente el día EXACTO y la hora EXACTA tras haberle mostrado la disponibilidad.',
+        'Crea una cita definitiva. Úsala solo cuando el cliente confirme explícitamente el servicio, fecha y hora exacta.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -74,7 +74,7 @@ export const tools = {
     {
       name: 'cancel_appointment',
       description:
-        'ACCIÓN DE CANCELACIÓN: Cancela una cita existente. ÚSALA CUANDO: 1. El cliente pide cancelar directamente. 2. Vas a reagendar a un cliente a una nueva hora o día, DEBES cancelar primero la cita original. 3. Si por error reservas algo mal y quieres corregirlo.',
+        'Cancela una cita existente. Úsala para cancelaciones directas o antes de reagendar a una nueva fecha/hora.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -91,7 +91,7 @@ export const tools = {
     {
       name: 'transfer_to_human',
       description:
-        'ACCIÓN DE ESCAPE: Transfiere la conversación del cliente inmediatamente a un agente humano. ÚSALA SI: 1. El cliente está enojado, frustrado o indispuesto. 2. Pide explícitamente hablar con una persona/asesor real. 3. El caso es muy complejo o no está en el catálogo.',
+        'Transfiere el chat a un humano si el cliente lo pide, está molesto o el caso es complejo.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -107,7 +107,7 @@ export const tools = {
     {
       name: 'save_pet_preference',
       description:
-        'HERRAMIENTA DE MEMORIA PERMANENTE. Úsala INMEDIATAMENTE cuando el cliente mencione un dato vital o preferencia a largo plazo. 1. MEDICAL: Úsala para Salud y Cuidados (alergias, condiciones médicas como dermatitis, requerimientos de salud). 2. BEHAVIOR: Temperamento y conducta. 3. PREFERENCES: Gustos o miedos. Un cliente puede tener varias mascotas, identifica de cuál habla.',
+        'Guarda datos vitales de la mascota: raza (breed), salud (medical), conducta (behavior) o gustos (preferences).',
       parameters: {
         type: 'OBJECT',
         properties: {
