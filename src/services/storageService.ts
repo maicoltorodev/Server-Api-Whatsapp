@@ -9,12 +9,18 @@ export class StorageService {
     private MAX_MEDIA_COUNT = 5;
 
     /**
-     * Optimiza una imagen a formato WebP
+     * Optimiza una imagen a formato WebP (máx 1200x1200, calidad 75)
      */
     public async optimizeImage(buffer: Buffer): Promise<Buffer> {
         try {
             return await sharp(buffer)
-                .webp({ quality: 80 })
+                .resize({
+                    width: 1200,
+                    height: 1200,
+                    fit: 'inside', // maintains aspect ratio without cropping
+                    withoutEnlargement: true // don't upscale small images
+                })
+                .webp({ quality: 75 })
                 .toBuffer();
         } catch (error) {
             logger.error(`❌ [STORAGE] Error optimizando imagen`, { error });
