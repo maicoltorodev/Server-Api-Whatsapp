@@ -32,7 +32,7 @@ export const botConfig = {
   // --------------------------------------------------------------------------
   ai: {
     // Modelo recomendado por Google para velocidad y balance de tokens
-    modelName: 'gemini-2.0-flash',
+    modelName: 'gemini-2.5-flash',
     // Entre más alto, más creativa es la IA. Entre más bajo, más robótica/estricta.
     temperature: 0.3,
     // Define el máximo histórico de mensajes que la IA recordará en memoria activa
