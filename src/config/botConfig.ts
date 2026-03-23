@@ -24,15 +24,15 @@ export const botConfig = {
 
   // Claves obligatorias para enviar y recibir mensajes de WhatsApp Cloud API
   waToken: process.env.WHATSAPP_TOKEN || '',
-  waPhoneId: process.env.WHATSAPP_PHONE_ID || '',
-  waVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'mi_token_secreto_123',
+  waPhoneId: process.env.WHATSAPP_PHONE_ID || process.env.PHONE_NUMBER_ID || '',
+  waVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || process.env.VERIFY_TOKEN || 'mi_token_secreto_123',
 
   // --------------------------------------------------------------------------
   // 2. PARÁMETROS DEL MODELO IA
   // --------------------------------------------------------------------------
   ai: {
     // Modelo recomendado por Google para velocidad y balance de tokens
-    modelName: 'gemini-1.5-flash-latest',
+    modelName: 'gemini-2.0-flash',
     // Entre más alto, más creativa es la IA. Entre más bajo, más robótica/estricta.
     temperature: 0.3,
     // Define el máximo histórico de mensajes que la IA recordará en memoria activa
