@@ -24,7 +24,6 @@ export class ConversationService {
     // 3. Verificar si el bot debe responder (Etapas)
     if (user.stage === 'DERIVADO_A_HUMANO') {
       logger.warn(`  ↳ Bot en PAUSA para ${phone}. El humano tiene el control.`);
-      // Opcional: Notificar al humano en Slack, Mail, etc.
       return { status: 'human_control' };
     }
 
@@ -42,19 +41,20 @@ export class ConversationService {
 
       if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
         logger.info(`La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map((c: any) => c.name).join(', ')}`);
-        
+
         const result = await aiService.processFunctionCalls(
           aiResponse.functionCalls,
           aiResponse.chatSession,
           phone
         );
-        responseText = result.text;
+        // Si la IA solo ejecutó tools y no generó texto posterior, usamos el texto previo al tool como fallback
+        responseText = result.text || aiResponse.text || '';
       } else {
         responseText = aiResponse.text;
       }
 
       // --- 🧠 EXTRAER RESUMEN DE MULTIMEDIA (Si existe) ---
-      let finalUserMessage = message; 
+      let finalUserMessage = message;
 
       if (hasMedia && responseText) {
         const match = responseText.match(/^\[(RESUMEN:\s*(.*?))\]\s*\n?/i);
@@ -69,17 +69,15 @@ export class ConversationService {
       await MemoryAdapter.saveMessage(phone, 'user', finalUserMessage);
 
       if (responseText.toUpperCase().includes('[SILENCIO]')) {
-        logger.info(`🤫 [IA] Decidió hacer SILENCIO para cortar el bucle de cortesía. abortando envío.`);
-        // Guardamos de todas formas en historial para que sepa que ya se calló
+        logger.info(`🤫 [IA] Decidió hacer SILENCIO. Abortando envío.`);
         await MemoryAdapter.saveMessage(phone, 'model', '[SILENCIO]');
         return { status: 'ai_silent' };
       }
 
-      // Validación de fallos
+      // Si no hay texto pero sí se ejecutaron tools, la IA solo actualizó estado (silencio intencional)
       if (!responseText || responseText.trim() === '') {
-        logger.warn(`[FALLO IA] No generó texto. Pasando a manual.`);
-        await MemoryAdapter.updateUser(phone, { stage: 'DERIVADO_A_HUMANO' });
-        return { status: 'error_no_text' };
+        logger.info(`🤫 [IA] Solo ejecutó tools sin respuesta de texto. Silencio intencional.`);
+        return { status: 'tools_only_silent' };
       }
 
       // Guardar en la DB simulada
@@ -87,24 +85,24 @@ export class ConversationService {
       logger.info(`[IA - RESPUESTA FINAL]: "${responseText}"`);
 
       // Timear la respuesta para simular escritura humana
-      const targetTypingDuration = Math.min(1000 + responseText.length * 10, 4000); 
+      const targetTypingDuration = Math.min(1000 + responseText.length * 10, 4000);
       const elapsed = Date.now() - typingStartedAt;
       const remainingTypingTime = Math.max(0, targetTypingDuration - elapsed);
 
       if (remainingTypingTime > 0) {
-         await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
+        await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
       }
 
       // Enviar a WhatsApp!
       await whatsappService.sendMessage(phone, responseText);
-      
+
       return { status: 'ai_responded' };
 
     } catch (error: any) {
-       logger.error(`❌ [ERROR - IA] Error en flujo de IA [${phone}]`, { error: error.message });
-       await MemoryAdapter.updateUser(phone, { stage: 'DERIVADO_A_HUMANO' });
-       await whatsappService.sendMessage(phone, "Disculpa, hubo un problema técnico. Te comunicaré con un humano.");
-       return { status: 'error', error: error.message };
+      logger.error(`❌ [ERROR - IA] Error en flujo de IA [${phone}]`, { error: error.message });
+      await MemoryAdapter.updateUser(phone, { stage: 'DERIVADO_A_HUMANO' });
+      await whatsappService.sendMessage(phone, "Disculpa, hubo un problema técnico. Te comunicaré con un humano.");
+      return { status: 'error', error: error.message };
     }
   }
 }
