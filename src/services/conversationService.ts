@@ -18,10 +18,8 @@ export class ConversationService {
       await MemoryAdapter.updateUser(phone, { lastInteraction: new Date() });
     }
 
-    // 2. Registrar mensaje del cliente en el Historial (Memoria)
+    // 2. Obtener historial para alimentar a Gemini (No guardamos el nuevo mensaje aún)
     const pastHistory = await MemoryAdapter.getHistory(phone);
-    
-    await MemoryAdapter.saveMessage(phone, 'user', message); // Guardamos solo el texto para no saturar memoria con audios en base64
 
     // 3. Verificar si el bot debe responder (Etapas)
     if (user.stage === 'DERIVADO_A_HUMANO') {
@@ -54,6 +52,21 @@ export class ConversationService {
       } else {
         responseText = aiResponse.text;
       }
+
+      // --- 🧠 EXTRAER RESUMEN DE MULTIMEDIA (Si existe) ---
+      let finalUserMessage = message; 
+
+      if (hasMedia && responseText) {
+        const match = responseText.match(/^\[(RESUMEN:\s*(.*?))\]\s*\n?/i);
+        if (match) {
+          finalUserMessage = `[${match[1]}]`; // Guardamos el resumen descriptivo
+          responseText = responseText.replace(match[0], '').trim(); // Removemos para el cliente
+          logger.info(`📸 [MULTIMEDIA RESUMEN EXTRACTO]: ${finalUserMessage}`);
+        }
+      }
+
+      // Guardamos ahora sí el mensaje del usuario con su resumen
+      await MemoryAdapter.saveMessage(phone, 'user', finalUserMessage);
 
       // Validación de fallos
       if (!responseText || responseText.trim() === '') {

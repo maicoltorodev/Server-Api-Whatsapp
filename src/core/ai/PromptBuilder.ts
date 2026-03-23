@@ -54,7 +54,15 @@ export class SystemPromptBuilder {
       delete this.components['MULTI'];
       return this;
     }
-    this.components['MULTI'] = `### 📸 VISIÓN Y AUDIO ACTIVOS\nTienes visión y oído habilitados en este mensaje. Analiza la imagen o nota de voz adjunta para responder con precisión.`;
+    this.components['MULTI'] = `### 📸 VISIÓN Y AUDIO ACTIVOS
+Tienes visión y oído habilitados en este mensaje. Analiza la imagen o nota de voz adjunta para responder.
+
+⚠️ **REGLA IMPORTANTE**: Debido a que este mensaje contiene multimedia, **DEBES incluir al INICIO de tu respuesta** (en la primera línea) un breve resumen entre corchetes descriptivo de lo que viste o escuchaste. 
+Ejemplos:
+- \`[RESUMEN: El cliente pregunta por precios de tarjetas de presentación de madera]\`
+- \`[RESUMEN: Foto de una tarjeta dañada con bordes rotos]\`
+
+Después de esa línea, escribe tu respuesta normal para el cliente. NO uses corchetes en tu respuesta final para el cliente.`;
     return this;
   }
 
