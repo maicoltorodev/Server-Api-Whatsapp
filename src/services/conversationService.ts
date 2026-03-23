@@ -21,14 +21,7 @@ export class ConversationService {
     // 2. Registrar mensaje del cliente en el Historial (Memoria)
     const pastHistory = await MemoryAdapter.getHistory(phone);
     
-    // Si la IA recibe media, se lo pasamos en formato in-line (base64)
-    // En produccion real, podrias querer subir esto a un bucket S3.
-    const mediaParts: any[] = media.map(m => ({ 
-      inlineData: { data: m.data, mimeType: m.mimeType }
-    }));
-    
-    const historyParts = [{ text: message }, ...mediaParts];
-    await MemoryAdapter.saveMessage(phone, 'user', JSON.stringify(historyParts)); // Guardamos un log simple
+    await MemoryAdapter.saveMessage(phone, 'user', message); // Guardamos solo el texto para no saturar memoria con audios en base64
 
     // 3. Verificar si el bot debe responder (Etapas)
     if (user.stage === 'DERIVADO_A_HUMANO') {
