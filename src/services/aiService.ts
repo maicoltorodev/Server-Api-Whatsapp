@@ -156,12 +156,10 @@ export class AIService {
   }
 
   private _sanitizeHistory(history: any[]) {
-    if (history.length === 0) return [];
-    const sanitized = [...history];
-
-    if (sanitized.length > 0 && sanitized[sanitized.length - 1].role === 'user') {
-      sanitized.pop();
-    }
+    if (!history || history.length === 0) return [];
+    
+    // 1. Filtrar mensajes basura o nulos
+    const sanitized = history.filter(msg => msg && msg.parts && msg.parts.length > 0);
 
     const alternatingHistory = [];
     for (const msg of sanitized) {
@@ -177,19 +175,35 @@ export class AIService {
         });
       }
 
-      if (
-        alternatingHistory.length > 0 &&
-        alternatingHistory[alternatingHistory.length - 1].role === safeMsg.role
-      ) {
+      const lastMsgInAlt = alternatingHistory.length > 0 
+        ? alternatingHistory[alternatingHistory.length - 1] 
+        : null;
+
+      // Unificar roles consecutivos (Para evitar user-user o model-model rígidos)
+      if (lastMsgInAlt && lastMsgInAlt.role === safeMsg.role) {
         if (safeMsg.role === 'user' && safeMsg.parts[0]?.text) {
-          alternatingHistory[alternatingHistory.length - 1].parts[0].text += ' ' + safeMsg.parts[0].text;
+          lastMsgInAlt.parts[0].text = (lastMsgInAlt.parts[0].text || '') + ' ' + safeMsg.parts[0].text;
+        } else if (safeMsg.role === 'model') {
+          // Si son dos de model seguidos, unificar texto si existe
+          if (safeMsg.parts[0]?.text && lastMsgInAlt.parts[0]?.text) {
+             lastMsgInAlt.parts[0].text += ' ' + safeMsg.parts[0].text;
+          }
         }
       } else {
         alternatingHistory.push(safeMsg);
       }
     }
+
+    // 🔴 REGLA DORADA DE GEMINI: El historial SIEMPRE debe empezar con rol 'user'.
+    // Si arranca con 'model', el primer turno se descarta.
+    while (alternatingHistory.length > 0 && alternatingHistory[0].role !== 'user') {
+      logger.warn(`🧹 [HISTORIAL] Removiendo mensaje inicial con rol '${alternatingHistory[0].role}' para cumplir requisitos de Gemini.`);
+      alternatingHistory.shift();
+    }
+
     return alternatingHistory;
   }
+
 
   private async _withRetry(fn: any, maxRetries = 3) {
     let lastError;
