@@ -11,18 +11,19 @@ export class AIService {
   constructor() { }
 
   /**
-   * Inicializa el modelo usando la memoria RAM y config monolítico
+   * Inicializa el modelo de IA con el protocolo completo de Nexa.
+   * @param userData Datos del usuario desde memoria
+   * @param hasMedia Si el mensaje tiene multimedia
+   * @param isNewUser Si es la primera interacción (historial vacío)
    */
-  public async initializeModel(userData: any, hasMedia: boolean = false): Promise<GenerativeModel> {
+  public async initializeModel(userData: any, hasMedia: boolean = false, isNewUser: boolean = false): Promise<GenerativeModel> {
     logger.info(`[IA] Inicializando modelo para usuario: ${userData?.name || 'Nuevo'}...`);
 
-    // Construir el Prompt Maestro Modularmente
     const promptBuilder = new SystemPromptBuilder()
-      .setPersona() 
+      .setProtocol(isNewUser)
       .setUserContext(userData?.name, userData?.preferences)
       .setCatalog()
-      .setMultimodalInstructions(hasMedia)
-      .setMasterInstructions(); 
+      .setMultimodalInstructions(hasMedia);
 
     const systemInstruction = promptBuilder.build();
 
@@ -33,8 +34,8 @@ export class AIService {
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     ];
 
-    const tools = botConfig.tools.functionDeclarations.length > 0 
-      ? [{ functionDeclarations: botConfig.tools.functionDeclarations }] 
+    const tools = botConfig.tools.functionDeclarations.length > 0
+      ? [{ functionDeclarations: botConfig.tools.functionDeclarations }]
       : undefined;
 
     const modelObj = genAI.getGenerativeModel({
@@ -46,6 +47,7 @@ export class AIService {
 
     return modelObj;
   }
+
 
   /**
    * Envía mensaje manejando el historial "mockeado" de la DB

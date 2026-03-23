@@ -34,7 +34,9 @@ export class ConversationService {
     // 5. Procesar con IA
     try {
       const hasMedia = media && media.length > 0;
-      const model = await aiService.initializeModel(user, hasMedia);
+      const isNewUser = pastHistory.length === 0;
+      const model = await aiService.initializeModel(user, hasMedia, isNewUser);
+
 
       const aiResponse = await aiService.generateResponse(model, message, pastHistory, media);
       let responseText = '';

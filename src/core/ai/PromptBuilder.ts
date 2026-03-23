@@ -3,51 +3,46 @@ import { botConfig } from '../../config/botConfig';
 export class SystemPromptBuilder {
   private components: Record<string, string> = {};
 
-  // Orden jerárquico optimizado: Identidad -> Contexto -> Catálogo -> Instrucciones Finales
+  // Orden determinista: Protocolo -> Contexto de usuario -> Catálogo -> Multimedia
   private static readonly COMPONENT_ORDER = [
-    'PER',       // 🎭 Persona e Identidad (Quién soy)
-    'LEAD',      // 👤 Contexto del Usuario (A quién le hablo)
-    'CAT',       // 🛒 Catálogo (Qué ofrezco/Sé)
-    'MULTI',     // 📸 Capacidades Visuales
-    'INST'       // 📋 ADN Maestros y Restricciones (Cómo debo actuar)
+    'PROTO',  // 🧠 Protocolo maestro de Nexa (8 secciones)
+    'LEAD',   // 👤 Contexto del cliente actual
+    'CAT',    // 🛒 Catálogo de productos
+    'MULTI',  // 📸 Instrucciones de visión/audio (solo si hay media)
   ];
 
   /**
-   * Define la personalidad base del agente desde la configuración maestra.
+   * Inyecta el protocolo maestro de Nexa (8 secciones).
+   * isNewUser=true inyecta [HISTORIAL_VACIO=true] para que Nexa se presente.
    */
-  public setPersona(): this {
-    this.components['PER'] = `### 🎭 IDENTIDAD\nNombre: ${botConfig.persona.name}\nEstilo: ${botConfig.persona.style}`;
+  public setProtocol(isNewUser: boolean): this {
+    const historialFlag = isNewUser ? '[HISTORIAL_VACIO=true]' : '[HISTORIAL_VACIO=false]';
+    this.components['PROTO'] = `${historialFlag}\n\n${botConfig.persona.protocol}`;
     return this;
   }
 
   /**
-   * Contexto del cliente (Dinámico, viene de la memoria).
+   * Contexto del cliente actual (dinámico, viene de la memoria).
    */
   public setUserContext(name: string, extraData: any = {}): this {
-    const extraInfo = Object.entries(extraData).map(([k, v]) => `- ${k}: ${v}`).join('\n');
-    this.components['LEAD'] = `### 👤 CONTEXTO DEL USUARIO\n- Nombre: ${name || 'Desconocido'}\n${extraInfo}`;
+    const extraInfo = Object.entries(extraData)
+      .filter(([, v]) => v !== undefined && v !== null)
+      .map(([k, v]) => `- ${k}: ${v}`)
+      .join('\n');
+    this.components['LEAD'] = `### 👤 CONTEXTO DEL CLIENTE ACTUAL\n- Nombre: ${name || 'Desconocido'}\n${extraInfo}`;
     return this;
   }
 
   /**
-   * Inyecta el catálogo de conocimiento/servicios de config.
+   * Inyecta el catálogo de productos desde config.
    */
   public setCatalog(): this {
-    this.components['CAT'] = `### 🛒 BASE DE CONOCIMIENTO (CATÁLOGO)\n${botConfig.catalog}`;
+    this.components['CAT'] = `### 🛒 CATÁLOGO DE PRODUCTOS (ÚNICA FUENTE DE VERDAD)\n${botConfig.catalog}`;
     return this;
   }
 
   /**
-   * Las directrices supremas cargadas desde config.
-   */
-  public setMasterInstructions(): this {
-    const rulesList = botConfig.persona.strictRules.map(r => `- ${r}`).join('\n');
-    this.components['INST'] = `### 📋 REGLAS DE ORO (ESTRICTAS)\n${rulesList}`;
-    return this;
-  }
-
-  /**
-   * Instrucciones específicas para el manejo de archivos multimedia.
+   * Instrucciones de multimedia (solo activas si el mensaje tiene media).
    */
   public setMultimodalInstructions(hasMedia: boolean): this {
     if (!hasMedia) {
@@ -55,14 +50,10 @@ export class SystemPromptBuilder {
       return this;
     }
     this.components['MULTI'] = `### 📸 VISIÓN Y AUDIO ACTIVOS
-Tienes visión y oído habilitados en este mensaje. Analiza la imagen o nota de voz adjunta para responder.
-
-⚠️ **REGLA IMPORTANTE**: Debido a que este mensaje contiene multimedia, **DEBES incluir al INICIO de tu respuesta** (en la primera línea) un breve resumen entre corchetes descriptivo de lo que viste o escuchaste. 
-Ejemplos:
-- \`[RESUMEN: El cliente pregunta por precios de tarjetas de presentación de madera]\`
-- \`[RESUMEN: Foto de una tarjeta dañada con bordes rotos]\`
-
-Después de esa línea, escribe tu respuesta normal para el cliente. NO uses corchetes en tu respuesta final para el cliente.`;
+Tienes visión y oído habilitados en este mensaje.
+OBLIGATORIO: La PRIMERA LÍNEA de tu respuesta debe ser un resumen entre corchetes:
+[RESUMEN: descripción breve de lo que viste/escuchaste]
+Luego escribe tu respuesta normal. NO uses corchetes en el resto de la respuesta.`;
     return this;
   }
 
@@ -74,7 +65,7 @@ Después de esa línea, escribe tu respuesta normal para el cliente. NO uses cor
   }
 
   /**
-   * Ensambla y retorna el sistema de instrucciones final en orden determinista
+   * Ensambla y retorna el prompt del sistema en orden determinista.
    */
   public build(): string {
     return SystemPromptBuilder.COMPONENT_ORDER
