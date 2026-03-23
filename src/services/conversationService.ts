@@ -68,6 +68,13 @@ export class ConversationService {
       // Guardamos ahora sí el mensaje del usuario con su resumen
       await MemoryAdapter.saveMessage(phone, 'user', finalUserMessage);
 
+      if (responseText.toUpperCase().includes('[SILENCIO]')) {
+        logger.info(`🤫 [IA] Decidió hacer SILENCIO para cortar el bucle de cortesía. abortando envío.`);
+        // Guardamos de todas formas en historial para que sepa que ya se calló
+        await MemoryAdapter.saveMessage(phone, 'model', '[SILENCIO]');
+        return { status: 'ai_silent' };
+      }
+
       // Validación de fallos
       if (!responseText || responseText.trim() === '') {
         logger.warn(`[FALLO IA] No generó texto. Pasando a manual.`);
