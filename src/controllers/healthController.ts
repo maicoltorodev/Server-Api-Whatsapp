@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
-import supabase from '../config/database';
-import { genAI } from '../config/ai';
-import config from '../config';
+import { botConfig } from '../config/botConfig';
+import { genAI } from '../services/aiService';
 
 export class HealthController {
   /**
@@ -19,7 +18,6 @@ export class HealthController {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       services: {
-        database: 'unknown',
         ai: 'unknown',
         whatsapp: 'unknown',
       },
@@ -27,21 +25,12 @@ export class HealthController {
       memory: process.memoryUsage(),
     };
 
-    try {
-      // Verificar conexión a base de datos
-      const { error } = await supabase.from('leads').select('id').limit(1);
-      healthStatus.services.database = error ? 'error' : 'healthy';
-    } catch (error) {
-      healthStatus.services.database = 'error';
-    }
-
     // Verificar servicio de IA
     try {
-      // Intentar una operación simple para verificar la API key
-      if (genAI) {
+      if (genAI && botConfig.geminiApiKey) {
         healthStatus.services.ai = 'healthy';
       } else {
-        healthStatus.services.ai = 'error';
+        healthStatus.services.ai = 'misconfigured';
       }
     } catch (error) {
       healthStatus.services.ai = 'error';
@@ -49,7 +38,7 @@ export class HealthController {
 
     // Verificar configuración de WhatsApp
     try {
-      if (config.PHONE_NUMBER_ID && config.WHATSAPP_TOKEN) {
+      if (botConfig.waPhoneId && botConfig.waToken) {
         healthStatus.services.whatsapp = 'healthy';
       } else {
         healthStatus.services.whatsapp = 'misconfigured';
@@ -59,9 +48,8 @@ export class HealthController {
     }
 
     const statusCode =
-      healthStatus.services.database === 'healthy' &&
-        healthStatus.services.ai === 'healthy' &&
-        healthStatus.services.whatsapp === 'healthy'
+      healthStatus.services.ai === 'healthy' &&
+      healthStatus.services.whatsapp === 'healthy'
         ? 200
         : 503;
 

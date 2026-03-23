@@ -84,7 +84,7 @@ export class MessageQueue {
       concurrencyQueue.enqueue(async () => {
         return await correlationContext.run({ id: correlationId || 'auto' }, async () => {
           try {
-            await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId, startTime);
+            await conversationService.handleIncomingMessage(from, combinedText, mediaItems, lastMsgId);
           } catch (error: any) {
             logger.error('Error crítico procesando mensaje desde la cola de concurrencia', { error });
           } finally {

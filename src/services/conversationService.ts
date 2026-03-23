@@ -1,274 +1,99 @@
-import leadModel from '../models/leadModel';
-import chatModel from '../models/chatModel';
+import MemoryAdapter from '../core/memoryAdapter';
 import aiService from './aiService';
 import whatsappService from './whatsappService';
-import notificationService from './notificationService';
-import storageService from './storageService';
-import systemLogModel from '../models/systemLogModel';
-import systemEvents from '../utils/eventEmitter';
 import logger from '../utils/logger';
-import { ILeadProfile, LeadProfileSchema } from '../types';
 
 export class ConversationService {
   /**
    * Procesa un mensaje entrante de un cliente de principio a fin
    */
-  public async handleIncomingMessage(phone: string, message: string, media: any[] = [], lastMsgId?: string, startTime?: number) {
-    logger.info(`🤖 [ORQUESTADOR] Iniciando proceso para el número: ${phone} | Media: ${media.length}`);
+  public async handleIncomingMessage(phone: string, message: string, media: any[] = [], lastMsgId?: string) {
+    logger.info(`🤖 [ORQUESTADOR] Iniciando proceso para: ${phone} | Media: ${media.length}`);
 
-    // 1. Obtener o crear Lead Raw
-    // logger.info(`[PASO 1] Verificando perfil del cliente en la Base de Datos...`);
-    let rawLead = await leadModel.getByPhone(phone);
-    if (!rawLead) {
-      // logger.info(`  ↳ Cliente nuevo. Creando perfil inicial...`);
-      rawLead = await leadModel.upsert({
-        phone,
-        name: 'Nuevo Cliente',
-        bot_active: true,
-        last_customer_message_at: new Date().toISOString()
-      });
+    // 1. Obtener o crear Usuario en Memoria (Mock CRM)
+    let user = await MemoryAdapter.getUser(phone);
+    if (!user) {
+      user = await MemoryAdapter.createUser(phone, 'Usuario ' + phone.slice(-4));
     } else {
-      // Actualizar el timestamp del último mensaje del cliente
-      await leadModel.updateStatus(phone, {
-        last_customer_message_at: new Date().toISOString()
-      });
+      await MemoryAdapter.updateUser(phone, { lastInteraction: new Date() });
     }
 
-    const parsed = LeadProfileSchema.safeParse(rawLead);
-    const leadData: ILeadProfile = parsed.success ? parsed.data : (rawLead as any);
-    // logger.info(`  ↳ Perfil listo: ${leadData.name || 'Sin nombre'} | Etapa: ${leadData.current_step}`);
+    // 2. Registrar mensaje del cliente en el Historial (Memoria)
+    const pastHistory = await MemoryAdapter.getHistory(phone);
+    
+    // Si la IA recibe media, se lo pasamos en formato in-line (base64)
+    // En produccion real, podrias querer subir esto a un bucket S3.
+    const mediaParts: any[] = media.map(m => ({ 
+      inlineData: { data: m.data, mimeType: m.mimeType }
+    }));
+    
+    const historyParts = [{ text: message }, ...mediaParts];
+    await MemoryAdapter.saveMessage(phone, 'user', JSON.stringify(historyParts)); // Guardamos un log simple
 
-    // 2. Registrar mensaje del cliente. CAPTURAR HISTORIAL PASADO ANTES DE AGREGAR EL NUEVO
-    // logger.info(`[PASO 2] Escribiendo el mensaje entrante en el Historial...`);
-    const pastHistory = await chatModel.getHistory(phone);
-
-    // Subir media a Storage si existe
-    const mediaParts: any[] = [];
-    if (media && media.length > 0) {
-      for (const item of media) {
-        try {
-          const buffer = Buffer.from(item.data, 'base64');
-          const url = await storageService.uploadBuffer(buffer, item.mimeType, phone);
-          if (url) {
-            mediaParts.push({
-              mediaUrl: url,
-              mediaType: item.mimeType.startsWith('image') ? 'image' : 'audio'
-            });
-          }
-        } catch (uploadError) {
-          logger.error(`Error procesando media para storage`, { uploadError });
-        }
-      }
+    // 3. Verificar si el bot debe responder (Etapas)
+    if (user.stage === 'DERIVADO_A_HUMANO') {
+      logger.warn(`  ↳ Bot en PAUSA para ${phone}. El humano tiene el control.`);
+      // Opcional: Notificar al humano en Slack, Mail, etc.
+      return { status: 'human_control' };
     }
 
-    const historyParts = [
-      { text: message },
-      ...mediaParts
-    ];
-
-    await chatModel.addMessage(phone, { role: 'user', parts: historyParts });
-    systemEvents.emit('lead_updated', { phone, type: 'new_message' });
-
-    // 3. Verificar si el bot debe responder
-    // logger.info(`[PASO 3] Consultando permisos de intervención del Bot...`);
-    if (leadData.bot_active === false) {
-      logger.warn(`  ↳ Bot en PAUSA para ${phone}. Delegando chat al dueño.`);
-      return await this.handleHumanIntervention(phone, leadData, message);
-    }
-    // logger.info(`  ↳ Bot ACTIVO. El Agente Inteligente tomará el caso.`);
-
-    // 4. Activar Indicador de Escritura (Typing...) y marcar tiempo
+    // 4. Activar Indicador de Escritura
     const typingStartedAt = Date.now();
     await whatsappService.sendTypingIndicator(phone, lastMsgId);
 
     // 5. Procesar con IA
-    // logger.info(`[PASO 4] Despertando motor de Inteligencia Artificial de Gemini (Multimodal)...`);
-    return await this.processWithAI(phone, message, leadData, pastHistory, media, startTime, typingStartedAt);
-  }
-
-  /**
-   * Maneja el flujo cuando un humano tiene el control
-   */
-  public async handleHumanIntervention(phone: string, leadData: ILeadProfile, message: string) {
-    logger.warn(
-      `Notificando al dueño que el cliente [${leadData.name || phone}] requiere atención manual.`
-    );
-    await notificationService.notifyHumanRequired(phone, leadData.name || 'Cliente', message);
-    return { status: 'human_control' };
-  }
-
-  /**
-   * Orquestación del flujo de IA (Multimodal)
-   */
-  public async processWithAI(phone: string, message: string, leadData: ILeadProfile, preloadedHistory?: any[], media: any[] = [], startTime?: number, typingStartedAt?: number) {
     try {
-      // A. Preparar contexto e historial
-      // logger.info(`[IA - INICIO] Preparando contexto dinámico para ${phone}...`);
       const hasMedia = media && media.length > 0;
-      const model = await aiService.prepareContext(leadData, hasMedia);
+      const model = await aiService.initializeModel(user, hasMedia);
 
-      const history = preloadedHistory || await chatModel.getHistory(phone);
-      // logger.info(`Historial cargado: ${history.length} mensajes previos.`);
-
-      // B. Generar respuesta
-      // logger.info(`[IA - PROCESANDO] Consultando a Gemini (Multimodal) para ${phone}...`);
-      const aiResponse = await aiService.generateResponse(model, message, history, media);
+      const aiResponse = await aiService.generateResponse(model, message, pastHistory, media);
       let responseText = '';
 
-      // C. Manejar Function Calls (si existen)
       if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
-        logger.info(
-          `La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map((c: any) => c.name).join(', ')}`
-        );
+        logger.info(`La IA solicitó ejecutar herramientas: ${aiResponse.functionCalls.map((c: any) => c.name).join(', ')}`);
+        
         const result = await aiService.processFunctionCalls(
           aiResponse.functionCalls,
           aiResponse.chatSession,
           phone
         );
         responseText = result.text;
-        logger.info(`Herramientas ejecutadas. Respuesta final de IA obtenida.`);
       } else {
-        logger.info(`La IA generó una respuesta de texto directa.`);
         responseText = aiResponse.text;
       }
 
-      // Validación de seguridad para evitar enviar mensajes vacíos a WhatsApp
+      // Validación de fallos
       if (!responseText || responseText.trim() === '') {
-        logger.warn(`La IA ejecutó procesos pero no generó texto. ACTIVANDO MODO MANUAL para evitar desatención en ${phone}.`);
-
-        // 1. Desactivar Bot por seguridad (Garantía de respuesta humana)
-        await leadModel.deactivateBot(phone);
-
-        // 2. Notificar al dueño urgentemente
-        await notificationService.notifyHumanRequired(phone, leadData.name || 'Cliente', `[FALLO IA] Miel no generó respuesta a: "${message}"`);
-
-        // 3. Registrar como evento técnico en la DB
-        await systemLogModel.log('WARN', 'Fallo técnico (Silencio IA) - Bot desactivado automáticamente', phone, {
-          originalMessage: message,
-          historyLength: history.length,
-          currentLeadStep: leadData.current_step
-        });
-
-        systemEvents.emit('lead_updated', { phone, type: 'bot_toggle', bot_active: false });
-        return { status: 'ai_responded_no_text_manual_activated' };
+        logger.warn(`[FALLO IA] No generó texto. Pasando a manual.`);
+        await MemoryAdapter.updateUser(phone, { stage: 'DERIVADO_A_HUMANO' });
+        return { status: 'error_no_text' };
       }
 
-      // E. Extraer y Procesar Humor (Mood Tracker)
-      let customerMood = 'NEUTRAL';
-      const moodMatch = responseText.match(/\[MOOD:\s*(FELIZ|NEUTRAL|MOLESTO|URGENTE)\]/i);
-      if (moodMatch) {
-        customerMood = moodMatch[1].toUpperCase();
-        // Limpiar el tag para que el cliente no lo vea
-        responseText = responseText.replace(/\[MOOD:\s*(FELIZ|NEUTRAL|MOLESTO|URGENTE)\]/i, '').trim();
+      // Guardar en la DB simulada
+      await MemoryAdapter.saveMessage(phone, 'model', responseText);
+      logger.info(`[IA - RESPUESTA FINAL]: "${responseText}"`);
 
-        // Actualizar en DB asíncronamente (sin bloquear la respuesta)
-        leadModel.updateStatus(phone, { customer_mood: customerMood }).catch((err: any) => {
-          logger.error(`Error actualizando humor para ${phone}:`, err);
-        });
-      }
-
-      // F. Manejar Silencio Intencional (Despedidas)
-      if (responseText.includes('[SILENCIO]')) {
-        logger.info(`[IA - SILENCIO] La IA determinó que la conversación ha finalizado. Humor detectado: ${customerMood}.`);
-        systemEvents.emit('lead_updated', { phone, type: 'ai_response' });
-        return { status: 'ai_silence_intentional' };
-      }
-
-      // G. Persistir respuesta de la IA en el historial (de forma incremental)
-      logger.info(`[IA - RESPUESTA FINAL] Respuesta para ${phone} [${customerMood}]: "${responseText}"`);
-      logger.info(`Guardando la respuesta de la IA en el historial...`);
-      await chatModel.addMessage(phone, { role: 'model', parts: [{ text: responseText }] });
-
-      // H. Simular realismo (Typing delay inteligente)
-      // El typing debe "acompañar" el proceso, no bloquearlo extra si ya pasó suficiente tiempo.
-      const targetTypingDuration = Math.min(1500 + responseText.length * 15, 6000); // Más agresivo: 1.5s - 6s
-      const elapsedSinceTyping = typingStartedAt ? Date.now() - typingStartedAt : 0;
-      const remainingTypingTime = Math.max(0, targetTypingDuration - elapsedSinceTyping);
+      // Timear la respuesta para simular escritura humana
+      const targetTypingDuration = Math.min(1000 + responseText.length * 10, 4000); 
+      const elapsed = Date.now() - typingStartedAt;
+      const remainingTypingTime = Math.max(0, targetTypingDuration - elapsed);
 
       if (remainingTypingTime > 0) {
-        logger.info(`[REALISMO] Completando ráfaga de escritura por ${remainingTypingTime}ms (IA fue muy rápida)...`);
-        await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
-      } else {
-        logger.info(`[REALISMO] Sin espera extra. El procesamiento de IA (${elapsedSinceTyping}ms) cubrió el tiempo de escritura.`);
+         await new Promise(resolve => setTimeout(resolve, remainingTypingTime));
       }
 
-      // I. Enviar al cliente
-      logger.info(`[PASO 5] Entregando la respuesta de Miel a WhatsApp...`);
+      // Enviar a WhatsApp!
       await whatsappService.sendMessage(phone, responseText);
-      logger.info(`  ↳ Mensaje de API enviado a ${phone} exitosamente.`);
+      
+      return { status: 'ai_responded' };
 
-      // I. Notificar actualización final
-      systemEvents.emit('lead_updated', { phone, type: 'ai_response' });
-
-      if (startTime) {
-        const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
-        logger.info(`⏱️ [TIEMPO TOTAL] Ciclo de respuesta completado en ${totalDuration}s para ${phone}`);
-      }
-
-      return { status: 'ai_responded', text: responseText };
     } catch (error: any) {
-      logger.error(`❌ [ERROR - IA] Error en flujo de IA [${phone}]`, { error });
-
-      // Persistimos el error en la base de datos para análisis posterior (Senior approach)
-      await systemLogModel.log('ERROR', 'Error crítico en flujo processWithAI - Bot desactivado', phone, {
-        context: { message, currentLeadStep: leadData.current_step },
-        stack: error.stack,
-        message: error.message
-      });
-
-      // Si hay un error crítico de código, también pasamos a manual para evitar bucles de errores
-      await leadModel.deactivateBot(phone);
-
-      // Enviamos el mensaje de fallback INMEDIATAMENTE para detener el "Escribiendo..." y dar feedback
-      await whatsappService.sendMessage(phone, "Disculpa, hubo un problema, te remitiremos a un humano en breve.");
-
-      await notificationService.notifyHumanRequired(phone, leadData.name || 'Cliente', `[ERROR CRÍTICO] El sistema falló al procesar: "${message}"`);
-      systemEvents.emit('lead_updated', { phone, type: 'bot_toggle', bot_active: false });
-
-      return { status: 'error', error: error.message };
+       logger.error(`❌ [ERROR - IA] Error en flujo de IA [${phone}]`, { error: error.message });
+       await MemoryAdapter.updateUser(phone, { stage: 'DERIVADO_A_HUMANO' });
+       await whatsappService.sendMessage(phone, "Disculpa, hubo un problema técnico. Te comunicaré con un humano.");
+       return { status: 'error', error: error.message };
     }
-  }
-
-  /**
-   * Envía un mensaje manual desde el panel y pausa la IA
-   */
-  public async sendManualMessage(phone: string, message: string) {
-    // 1. Desactivar Bot para dar control al humano
-    await leadModel.deactivateBot(phone);
-
-    // 2. Enviar mensaje vía WhatsApp
-    await whatsappService.sendMessage(phone, message);
-
-    // 3. Registrar en historial como una nota del sistema
-    await chatModel.addMessage(phone, {
-      role: 'model',
-      parts: [
-        {
-          text: `[NOTA DEL SISTEMA: UN AGENTE HUMANO INTERVINO Y LE ENVIÓ EL SIGUIENTE MENSAJE AL CLIENTE]: "${message}"`,
-        },
-      ],
-    });
-
-    // 4. Notificar actualización
-    systemEvents.emit('lead_updated', { phone, type: 'manual_message', bot_active: false });
-
-    return { status: 'success', bot_deactivated: true };
-  }
-
-  /**
-   * Cambia el estado del Bot (Activar/Desactivar)
-   */
-  public async toggleBot(phone: string, active: boolean) {
-    if (active) {
-      await leadModel.activateBot(phone);
-    } else {
-      await leadModel.deactivateBot(phone);
-    }
-
-    systemEvents.emit('lead_updated', { phone, type: 'bot_toggle', bot_active: active });
-    return { status: 'success', bot_active: active };
   }
 }
 
 export default new ConversationService();
-

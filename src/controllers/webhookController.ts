@@ -1,43 +1,31 @@
 import { Request, Response } from 'express';
 import whatsappService from '../services/whatsappService';
-import conversationService from '../services/conversationService';
-import leadModel from '../models/leadModel';
-import notificationService from '../services/notificationService';
-import rateLimiter from '../middleware/rateLimit';
-import config from '../config';
+import { botConfig } from '../config/botConfig';
 import messageQueue from '../utils/messageQueue';
 import logger, { correlationContext } from '../utils/logger';
 
 export class WebhookController {
-  /**
-   * Maneja el webhook principal de WhatsApp
-   */
+  
   public async handleWebhook(req: Request, res: Response) {
     const body = req.body;
+    // Responder inmediatamente a WhatsApp (Regla de Meta: Responder 200 en < 3 segs)
     res.sendStatus(200);
 
     try {
       const startTime = Date.now();
-      // 1. Extraer mensaje de los metadatos
       const message = whatsappService.extractMessageFromWebhook(body);
-      if (!message) {
-        // Ignoramos silenciosamente notificaciones de lectura o estado
-        return;
-      }
+      
+      if (!message) return;
 
       const { id: msgId, from, text, isText } = message as any;
       const correlationId = msgId.slice(-4);
 
       return await correlationContext.run({ id: correlationId }, async () => {
-        // 2. Seguridad y Duplicados
-        if (rateLimiter.isMessageProcessed(msgId)) {
-          logger.warn(`Mensaje duplicado detectado (ID: ${msgId}). Ignorando.`);
-          return;
-        }
+        
+        // Marcamos como leído
         await whatsappService.markAsRead(msgId);
-        // logger.info(`Mensaje marcado como leído.`);
 
-        // 3. Procesar Contenido (Media o Texto)
+        // Si es Media (Imagen, Audio)
         if (!isText) {
           if (message.isMedia && message.mediaId) {
             logger.info(`📸 [MEDIA DETECTADO] Descargando ${message.type} de ${from}...`);
@@ -48,52 +36,32 @@ export class WebhookController {
               if (buffer) {
                 const base64Media = buffer.toString('base64');
                 const mediaContent = {
-                  text: message.text || (message.type === 'audio' ? '[AUDIO]' : (message.type === 'sticker' ? '[STICKER]' : '[IMAGEN]')),
-                  media: {
-                    data: base64Media,
-                    mimeType: message.mimeType
-                  }
+                  text: message.text || `[${message.type.toUpperCase()}]`,
+                  media: { data: base64Media, mimeType: message.mimeType }
                 };
 
-                // logger.info(`Poniendo MEDIA en la cola (ID: ${message.mediaId})...`);
                 messageQueue.enqueueMessage(from, mediaContent, message.id, startTime);
                 return;
               }
             }
           }
-
-          logger.warn(`[WEBHOOK] Contenido no soportado (Tipo: ${message.type}) recibido de ${from}. IGNORANDO silenciosamente según reglas de negocio.`);
+          logger.warn(`[WEBHOOK] Contenido no soportado de ${from}. Ignorando.`);
           return;
         }
 
-        // logger.info(`🔵 [MENSAJE NUEVO DETALLE] "${text}" de "${from}"`);
+        // Si es Texto normal, encolamos para soportar ráfagas (cliente manda varios msgs cortos seguidos)
         messageQueue.enqueueMessage(from, { text }, msgId, startTime);
       });
     } catch (error: any) {
-      logger.error('Error crítico en WebhookController', { error });
-      await this.handleCriticalError(req.body, error);
+      logger.error('Error crítico en WebhookController', { error: error.message });
     }
   }
 
   /**
-   * Maneja errores críticos notificando al admin
-   */
-  public async handleCriticalError(body: any, error: any) {
-    try {
-      const fromNumber = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from;
-      if (fromNumber) {
-        await notificationService.notifyCriticalError(fromNumber, error.message);
-      }
-    } catch (innerError) {
-      logger.error('No se pudo notificar la falla', { error: innerError });
-    }
-  }
-
-  /**
-   * Verificación del webhook (Requerido por Meta en el setup)
+   * Challenge de Verificación de Meta al configurar Webhook
    */
   public verifyWebhook(req: Request, res: Response) {
-    if (req.query['hub.verify_token'] === config.VERIFY_TOKEN) {
+    if (req.query['hub.verify_token'] === botConfig.waVerifyToken) {
       res.send(req.query['hub.challenge']);
     } else {
       res.sendStatus(403);

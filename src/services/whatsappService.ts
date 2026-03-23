@@ -1,4 +1,4 @@
-import config from '../config';
+import { botConfig } from '../config/botConfig';
 import { isValidWhatsAppMessage } from '../utils/validators';
 import logger from '../utils/logger';
 
@@ -7,17 +7,19 @@ export class WhatsAppService {
   headers: any;
 
   constructor() {
-    this.baseUrl = `https://graph.facebook.com/v22.0/${config.PHONE_NUMBER_ID}/messages`;
+    this.baseUrl = `https://graph.facebook.com/v22.0/${botConfig.waPhoneId}/messages`;
     this.headers = {
-      Authorization: `Bearer ${config.WHATSAPP_TOKEN}`,
+      Authorization: `Bearer ${botConfig.waToken}`,
       'Content-Type': 'application/json',
     };
   }
 
-  /**
-   * Envía un mensaje de texto por WhatsApp
-   */
   public async sendMessage(to: string, text: string) {
+    if (!botConfig.waToken || !botConfig.waPhoneId) {
+      logger.warn(`[WHATSAPP API - MOCK] Mensaje a ${to}: "${text}" (Faltan credenciales WA)`);
+      return;
+    }
+
     try {
       const response = await fetch(this.baseUrl, {
         method: 'POST',
@@ -30,77 +32,18 @@ export class WhatsAppService {
         })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(JSON.stringify(errorData));
-      }
-
+      if (!response.ok) throw new Error(await response.text());
       logger.info(`✅ [WHATSAPP API] Mensaje enviado a ${to}: "${text.substring(0, 50)}..."`);
     } catch (error: any) {
-      logger.error(`❌ [WHATSAPP API - ERROR] No se pudo enviar el mensaje a ${to}.`, {
-        message: error.message,
-        stack: error.stack,
-      });
-      throw error;
+      logger.error(`❌ [WHATSAPP API - ERROR] No se pudo enviar el mensaje a ${to}.`, { message: error.message });
     }
   }
 
-  /**
-   * Obtiene la URL de descarga de un archivo multimedia desde Meta
-   */
-  public async getMediaUrl(mediaId: string): Promise<string | null> {
-    try {
-      const response = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, {
-        headers: this.headers,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(JSON.stringify(errorData));
-      }
-
-      const data: any = await response.json();
-      return data.url;
-    } catch (error: any) {
-      logger.error(`❌ [WHATSAPP API - ERROR] No se pudo obtener la URL del media ${mediaId}`, {
-        error: error.message,
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Descarga un archivo multimedia y lo retorna como Buffer
-   */
-  public async downloadMedia(url: string): Promise<Buffer | null> {
-    try {
-      const response = await fetch(url, {
-        headers: this.headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error descargando media: ${response.statusText}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer);
-    } catch (error: any) {
-      logger.error(`❌ [WHATSAPP API - ERROR] Fallo al descargar el archivo: ${url}`, {
-        error: error.message,
-      });
-      return null;
-    }
-  }
-
-  /**
-   * Marca un mensaje como leído con un pequeño retraso para evitar errores de sincronización de Meta
-   */
   public async markAsRead(messageId: string) {
+    if (!botConfig.waToken) return;
     try {
-      // Pequeño retraso de 1s para asegurar que Meta haya registrado el ID (especialmente útil en multimedia)
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const response = await fetch(this.baseUrl, {
+      await fetch(this.baseUrl, {
         method: 'POST',
         headers: this.headers,
         body: JSON.stringify({
@@ -109,107 +52,31 @@ export class WhatsAppService {
           message_id: messageId,
         })
       });
-
-      if (!response.ok) {
-        const errorData: any = await response.json();
-        // Si el error es que el ID no existe, lo tratamos como advertencia, no como error crítico
-        if (errorData.error?.code === 100 || errorData.error?.message?.includes("does not exist")) {
-          logger.warn(`⚠️ [WHATSAPP API] No se pudo marcar como leído: El ID ${messageId} todavía no es reconocido por Meta (Sincronización).`);
-          return;
-        }
-        throw new Error(JSON.stringify(errorData));
-      }
-
       logger.info(`🔹 [WHATSAPP API] Mensaje ${messageId} marcado como leído.`);
-    } catch (error: any) {
-      logger.error(`❌ [WHATSAPP API - ERROR] Error inesperado marcando mensaje como leído (ID: ${messageId})`, {
-        error: error.message,
-      });
+    } catch (e: any) {
+      logger.error(`❌ Error marcando como leído: ${e.message}`);
     }
   }
 
-  /**
-   * Envía el indicador de "escribiendo..." (Nativo Meta v22.0+)
-   */
-  public async sendTypingIndicator(to: string, messageId?: string) {
-    if (!messageId) {
-      logger.warn(`⚠️ [WHATSAPP API] No se puede enviar indicador de escritura a ${to}: Falta ID del mensaje.`);
-      return;
-    }
-
-    logger.debug(`[WHATSAPP API] Intentando activar "Escribiendo..." para mensaje ${messageId}...`);
-    try {
-      const response = await fetch(this.baseUrl, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          status: 'read',
-          message_id: messageId,
-          typing_indicator: {
-            type: 'text'
-          }
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        logger.warn(`⚠️ [WHATSAPP API] El indicador de escritura no fue aceptado por Meta.`, {
-          status: response.status,
-          data
-        });
-        return;
-      }
-
-      logger.info(`✍️ [WHATSAPP API] Indicador de escritura activo para ${to}`);
-    } catch (error: any) {
-      logger.error(`❌ [WHATSAPP API - ERROR] Fallo crítico al intentar enviar el indicador a ${to}.`, {
-        message: error.message
-      });
-    }
-  }
-
-  /**
-   * Extrae el mensaje del webhook de WhatsApp
-   */
   public extractMessageFromWebhook(body: any) {
-    if (body.object !== 'whatsapp_business_account') {
-      return null;
-    }
-
+    if (body.object !== 'whatsapp_business_account') return null;
     const message = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    if (!message) {
-      return null;
-    }
+    if (!message) return null;
 
-    // Validar que sea un mensaje de texto válido
     if (!isValidWhatsAppMessage(message)) {
-      // Si es imagen, audio o sticker, los procesamos de forma especial
-      if (message.type === 'image' || message.type === 'audio' || message.type === 'sticker') {
-        const mediaId = message.image?.id || message.audio?.id || message.sticker?.id;
-        const mimeType = message.image?.mime_type || message.audio?.mime_type || message.sticker?.mime_type;
-        const caption = message.image?.caption || "";
-
+      if (['image', 'audio', 'sticker'].includes(message.type)) {
         return {
           id: message.id,
           from: message.from,
           type: message.type,
           isText: false,
           isMedia: true,
-          mediaId,
-          mimeType,
-          text: caption // Las imágenes a veces tienen pies de foto
+          mediaId: message[message.type]?.id,
+          mimeType: message[message.type]?.mime_type,
+          text: message[message.type]?.caption || ""
         };
       }
-
-      return {
-        id: message.id,
-        from: message.from,
-        type: message.type,
-        isText: false,
-        isMedia: false
-      };
+      return { id: message.id, from: message.from, type: message.type, isText: false, isMedia: false };
     }
 
     return {
@@ -221,7 +88,51 @@ export class WhatsAppService {
       isMedia: false
     };
   }
+
+  public async getMediaUrl(mediaId: string): Promise<string | null> {
+    try {
+      const response = await fetch(`https://graph.facebook.com/v22.0/${mediaId}`, { headers: this.headers });
+      if (!response.ok) throw new Error(await response.text());
+      const data: any = await response.json();
+      return data.url;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  public async downloadMedia(url: string): Promise<Buffer | null> {
+    try {
+      const response = await fetch(url, { headers: this.headers });
+      if (!response.ok) throw new Error(response.statusText);
+      return Buffer.from(await response.arrayBuffer());
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Envía el indicador de "escribiendo..." (Nativo Meta v22.0+)
+   */
+  public async sendTypingIndicator(to: string, messageId?: string) {
+    if (!messageId || !botConfig.waToken) return;
+    try {
+      await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          status: 'read',
+          message_id: messageId,
+          typing_indicator: { type: 'text' }
+        })
+      });
+      logger.info(`✍️ [WHATSAPP API] Indicador de escritura activo para ${to}`);
+    } catch (error: any) {
+      logger.error(`❌ [WHATSAPP API - ERROR] Fallo al enviar indicador de escritura a ${to}.`, {
+        message: error.message
+      });
+    }
+  }
 }
 
 export default new WhatsAppService();
-

@@ -1,108 +1,77 @@
-# Pet Care Studio - Backend AI & Booking System
+# 🤖 AI Bot Template - WhatsApp + Gemini AI
 
-## 🏗️ Arquitectura Modular y Segura
+Este proyecto es una **plantilla Boilerplate/Framework** para construir asistentes conversacionales con Inteligencia Artificial utilizando la tecnología de **Google Gemini** conectados a **WhatsApp Cloud API (Meta)**.
 
-Este proyecto es un backend robusto diseñado para gestionar reservas automáticas mediante una Inteligencia Artificial (Gemini) conectada a WhatsApp. Ha sido refactorizado desde una arquitectura monolítica hacia una estructura modular, implementando principios SOLID, y cuenta con un **fuerte endurecimiento comercial e infraestructura transaccional**.
+Ha sido diseñado para ser **liviano, agnóstico de base de datos y altamente modular**, controlado por un archivo de configuración monolítico.
 
-## 📁 Estructura del Proyecto
+---
+
+## 📁 Estructura Principal
 
 ```text
 src/
-├── config/                 # Configuración centralizada
-│   ├── index.js           # Variables de entorno y constantes de negocio
-│   ├── database.js        # Configuración de cliente Supabase
-│   └── ai.js              # Inicialización de Gemini AI y Tools
-├── middleware/            # Middlewares de Express
-│   ├── verifyMetaSignature.js # Verificación estricta (anti-spoofing) HMAC SHA-256
-│   └── rateLimit.js       # Anti-spam y limitadores
-├── services/              # Lógica de negocio dura
-│   ├── whatsappService.js # Intermediario Meta API
-│   ├── aiService.js       # Manejo conversacional y function-calling
-│   ├── appointmentService.js # Orquestador de agenda, algoritmos y disponibilidad
-│   └── notificationService.js # Alertas al dueño
-├── controllers/           # Controladores HTTP
-│   ├── webhookController.js # Recepción y ruteo de Webhooks (Meta)
-│   └── healthController.js # Endpoints de diagnóstico
-├── models/               # Interfaz con la Base de datos (Supabase)
-│   ├── leadModel.js      # Operaciones con leads y funnels
-│   ├── chatModel.js      # Historial conversacional
-│   └── sessionModel.js   # Intervención humana (handoff)
-├── utils/                # Utilidades
-│   ├── validators.js     # Validaciones de fecha y hora (Timezone: Bogotá)
-│   └── cache.js          # In-memory caching (Catálogo y Configuración)
-├── routes/               # Rutas HTTP
-│   └── webhook.js        # ...
-└── server.js             # Punto de entrada
-database/
-└── 01_rpc_book_appointment.sql # Script SQL para Race Conditions (Locks transaccionales)
+├── config/
+│   └── botConfig.ts       <-- 🧠 TODA la configuración: Reglas, Catalog, Tools, Identidad.
+├── controllers/
+│   ├── webhookController.ts <-- Recepción de Webhooks (Meta).
+│   └── healthController.ts  <-- Diagnósticos.
+├── core/
+│   ├── ai/PromptBuilder.ts  <-- Ensambla el Prompt dinámico.
+│   └── memoryAdapter.ts     <-- 💾 Base de datos en memoria (Fácil de reemplazar).
+├── services/
+│   ├── aiService.ts         <-- Motor de Gemini Conversacional.
+│   ├── whatsappService.ts   <-- Consumo de API de Meta.
+│   └── toolService.ts       <-- 🛠️ Herramientas ejecutables (Function Calling).
+└── server.ts                <-- Express Server de la plantilla.
 ```
 
-## 🚀 Iniciar el Proyecto
+---
 
-1. Instalar dependencias:
-```bash
-npm install
-```
+## 🚀 Inicio Rápido
 
-2. Configurar variables de entorno en `.env`:
-```env
-PORT=3000
-PHONE_NUMBER_ID=tu_phone_id
-WHATSAPP_TOKEN=tu_token
-META_APP_SECRET=tu_app_secret
-VERIFY_TOKEN=tu_verify_token
+1. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
 
-GEMINI_API_KEY=tu_gemini_key
-SUPABASE_URL=tu_supabase_url
-SUPABASE_KEY=tu_supabase_key
-```
+2. **Copiar y configurar `.env`:**
+   Crea un archivo `.env` en la raíz (puedes basarte en `.env.example` si existe):
+   ```env
+   PORT=3000
+   GEMINI_API_KEY=tu_api_key_de_gemini
+   WHATSAPP_PHONE_ID=tu_numero_id_de_meta
+   WHATSAPP_TOKEN=tu_token_de_meta
+   WHATSAPP_VERIFY_TOKEN=tu_verify_token_elegido
+   ```
 
-3. Iniciar servidor:
-```bash
-npm start
-```
+3. **Ejecutar en desarrollo:**
+   ```bash
+   npm run dev
+   ```
 
-## 📋 Características Principales y Endurecimiento
+---
 
-### 🔐 Seguridad y Prevención de Spoofing
-- Verificación estricta de firma de Meta mediante `crypto.timingSafeEqual` para evadir ataques de timing.
-- Logs estructurados en JSON en caso de alertas de seguridad y firmas no coincidentes.
-- Rate limiting anti-spam que detecta abusos (ej. bombardeo de mensajes) y auto-desactiva la atención al cliente abusador.
+## 📖 Guías para el desarrollador
 
-### 🤖 Inteligencia Artificial "Grounded" (Anti-Alucinaciones)
-- Integración dinámica con **Gemini 2.5 Pro**, con acceso a contexto de ventas y recordatorio.
-- **Herramientas (Function Calling):** La IA puede agendar citas, actualizar logs y enviar casos delicados a agentes humanos (`transfer_to_human`).
-- **Pared Anti-Alucinaciones:** Si la IA intenta reservar un servicio inventado o "alucina" el tiempo de duración, el sistema lo bloquea forzando la contrastación estricta con el Catálogo de la Base de Datos. La IA debe pedir confirmación con un servicio real.
+Para aprender a:
+- Conectar una **Base de Datos real** (Supabase, Postgres, MongoDB).
+- Cambiar la **Identidad y Respuestas** de tu Bot.
+- Crear nuevas **Functions / Tools** para la IA.
 
-### 📅 Agenda Transaccional y Sin Race Conditions
-- Agendamiento delegando consistencia a **Procedimientos Almacenados (RPC) en Postgres/Supabase**.
-- Uso de **Advisory Locks** (`pg_advisory_xact_lock`) a nivel de base de datos para manejar la alta concurrencia: si 100 usuarios intentan agendar a las 3:00 PM simultáneamente, el sistema atiende uno por uno y previene agendar superando el límite del local.
-- Evaluación **dinámica** de disponibilidad tomando en cuenta los horarios de cierre, y la duración real (en minutos) de cada servicio consultado.
+Consulta la guía completa: [**TEMPLATE_GUIDE.md**](./TEMPLATE_GUIDE.md)
 
-### 📊 Observabilidad y Métricas Comerciales
-- Captura de excepciones con logs tipificados (json) indicando el "embudo de base de datos" donde ocurrió una falla.
-- Registro en `console.info` en formato JSON para herramientas de analítica (ej. Datadog / CloudWatch) reportando eventos como:
-  - `cita_creada`
-  - `cita_cancelada`
-  - `conversion_ia_cita`
-  - `transferencia_humano`
+---
 
-## �️ Tecnologías
+## 🧪 Diagnóstico
 
-- **Node.js + Express** - Backend framework
-- **Supabase (Postgres)** - Sistema de DB y Ejecución SQL aislada
-- **Gemini AI SDK** - Inteligencia Artificial central
-- **Meta WhatsApp Graph API** - Puerta de enlace B2C
+Puedes probar que el servidor esté activo navegando o haciendo un curl a:
+`http://localhost:3000/health`
+O el diagnóstico detallado:
+`http://localhost:3000/health/detailed`
 
-## 🧪 Pruebas y Diagnóstico
+---
 
-Para consultar la salud del sistema o crear un monitor de uptime:
-```bash
-curl http://localhost:3000/health/detailed
-```
+## 📈 Próximos Pasos Sugeridos
 
-## 📈 Próximos Pasos Recomendados (Fase SaaS Escalar)
-
-- Implementación Multi-tenant (para vender a distintos locales/pet-shops).
-- Panel administrativo (Frontend Dashboard) para consumir las citas.
-- Redis distribuido para caché en clúster.
+- **Implementar persistencia:** Reemplazar el `MemoryAdapter` por tu ORM o Cliente de base de datos favorito.
+- **Multimodalidad:** Se ha preparado el pipeline en `conversationService.ts` para capturar imágenes y audios si el webhook de Meta los envía.

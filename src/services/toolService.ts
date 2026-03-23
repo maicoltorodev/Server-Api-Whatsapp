@@ -1,103 +1,72 @@
-import leadModel from '../models/leadModel';
-import appointmentService from './appointmentService';
-import notificationService from './notificationService';
 import logger from '../utils/logger';
+import MemoryAdapter from '../core/memoryAdapter';
 
 export class ToolService {
   /**
-   * Actualiza el perfil del lead basado en la conversación
+   * Herramienta 1: Actualiza preferencias en el perfil del usuario (Mock DB)
    */
-  public async update_lead_info(args: any, phone: string) {
+  public async save_user_preference(args: any, phone: string) {
     try {
-      if (Object.keys(args).length > 0) {
-        await leadModel.updateStatus(phone, args);
+      const { category, value } = args;
+      if (!category || !value) {
+        return { status: 'error', message: 'Faltan parámetros requeridos (category, value).' };
       }
 
-      logger.info(`[TOOL] Success: Lead info updated.`);
-      return { status: 'ok', message: 'Información actualizada correctamente.' };
+      // Guardamos la preferencia en nuestro adaptador en memoria
+      await MemoryAdapter.savePreference(phone, category, value);
+      
+      logger.info(`[TOOL] Preferencia guardada para ${phone}: ${category} = ${value}`);
+      return { status: 'ok', message: `Preferencia '${category}' guardada exitosamente.` };
     } catch (error: any) {
-      logger.error(`[TOOL] Error updating lead info`, { error });
-      return { status: 'error', message: error.message };
+      logger.error(`[TOOL] Error guardando preferencia`, { error });
+      return { status: 'error', message: 'Error interno guardando la preferencia.' };
     }
   }
 
   /**
-   * Consulta disponibilidad de citas
+   * Herramienta 1.5: Actualiza el estado del pedido completo (FSM)
    */
-  public async check_availability(args: any) {
-    const result = await appointmentService.checkAvailability(args);
-    logger.info(`[TOOL] Result: Found ${result.available_slots?.length || 0} slots.`);
-    return result;
-  }
-
-  /**
-   * Reserva una cita
-   */
-  public async book_appointment(args: any, phone: string) {
-    const leadData = await leadModel.getByPhone(phone);
-    const result = await appointmentService.bookAppointment(phone, leadData, args);
-
-    if (result.status === 'success') {
-      logger.info(`[TOOL] Success: Appointment booked. Moving lead to 'AGENDA' stage.`);
-      await leadModel.updateStep(phone, 'AGENDA');
-    } else {
-      logger.warn(`[TOOL] Failed to book: ${result.message}`);
-      // PRO TIP: Devolvemos el mensaje exacto para que la IA sepa explicar el 'Por Qué'
-      return {
-        status: 'error',
-        message: `No se pudo agendar: ${result.message}. Si el problema es de horario o cupo, pide disculpas y ofrece las alternativas disponibles más cercanas.`
-      };
+  public async update_user_state(args: any, phone: string) {
+    try {
+      const { producto, tiene_diseno, tamano, fase } = args;
+      
+      if (producto !== undefined) await MemoryAdapter.savePreference(phone, 'producto', producto);
+      if (tiene_diseno !== undefined) await MemoryAdapter.savePreference(phone, 'tiene_diseno', String(tiene_diseno));
+      if (tamano !== undefined) await MemoryAdapter.savePreference(phone, 'tamano', tamano);
+      if (fase !== undefined) await MemoryAdapter.savePreference(phone, 'fase', fase);
+      
+      logger.info(`[TOOL] Estado de usuario actualizado para ${phone}`, args);
+      return { status: 'ok', message: 'Estado del pedido actualizado correctamente.' };
+    } catch (error: any) {
+      logger.error(`[TOOL] Error actualizando estado`, { error });
+      return { status: 'error', message: 'Error interno actualizando el estado.' };
     }
-
-    return result;
   }
 
   /**
-   * Cancela una cita
-   */
-  public async cancel_appointment(args: any, phone: string) {
-    const result = await appointmentService.cancelAppointment(phone, args);
-    logger.info(`[TOOL] Result: ${result.status}`);
-    return result;
-  }
-
-  /**
-   * Solicita intervención humana
+   * Herramienta 2: Solicita intervención humana
    */
   public async transfer_to_human(args: any, phone: string) {
-    const leadData = await leadModel.getByPhone(phone);
-    await leadModel.deactivateBot(phone);
-    await notificationService.notifyOwner(
-      phone,
-      leadData?.name || 'Cliente',
-      'Solicitud de transferencia a humano'
-    );
-    logger.warn(`[TOOL] Bot deactivated. Human notified.`);
-
-    return {
-      status: 'transferred',
-      message: 'Se ha notificado a un agente humano. El bot ha sido desactivado para este chat.',
-    };
-  }
-
-  /**
-   * Memoria a largo plazo - Guarda información permanente de la mascota
-   */
-  public async save_pet_preference(args: any, phone: string) {
     try {
-      const { category, value, pet_name } = args;
-      await leadModel.updateMedicalHistory(phone, category, value, pet_name);
-      logger.info(`[TOOL] Success: Preference saved in medical_history for pet: ${pet_name}.`);
+      const { reason } = args;
+      
+      // Actualizamos la etapa del lead en el CRM para que el bot lo ignore en el futuro
+      await MemoryAdapter.updateUser(phone, { stage: 'DERIVADO_A_HUMANO' });
+      
+      logger.warn(`[TOOL] Transferencia a humano solicitada para ${phone}. Razón: ${reason}`);
+
+      // Aquí podrías disparar un email, enviar mensaje a Slack, etc.
       return {
-        status: 'saved',
-        message: `Dato guardado permanentemente para '${pet_name}' en la categoría '${category}'. Ahora lo recordarás siempre.`,
+        status: 'transferred',
+        message: 'Se ha notificado a un agente humano. El bot ha sido pausado para este chat.',
       };
     } catch (error: any) {
-      logger.error(`[TOOL] Error saving preference`, { error });
-      return { status: 'error', message: 'Fallo al guardar el historial médico.' };
+       logger.error(`[TOOL] Error transfiriendo a humano`, { error });
+       return { status: 'error', message: 'Error al solicitar transferencia a humano.' };
     }
   }
+
+  // Agrega aquí más herramientas que declares en botConfig.ts...
 }
 
 export default new ToolService();
-
