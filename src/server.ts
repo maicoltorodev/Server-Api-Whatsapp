@@ -89,3 +89,5 @@ process.on('uncaughtException', (err) => {
 });
 
 export default app;
+
+// Comentario para forzar re-deploy y refrescar cola de Railway.
